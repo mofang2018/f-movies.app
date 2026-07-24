@@ -1,0 +1,16 @@
+{
+  "name": "F.MOVIES",
+  "short_name": "F.MOVIES",
+  "description": "Discover movies and TV series with F.MOVIES.",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#1e2129",
+  "theme_color": "#13151a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

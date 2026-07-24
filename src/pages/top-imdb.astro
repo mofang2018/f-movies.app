@@ -2,16 +2,24 @@
 import MediaGrid from "../components/MediaGrid.astro";
 import Pagination from "../components/Pagination.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { canonicalPath, paginationLinks } from "../lib/seo";
 import { getTmdbToken, TmdbClient } from "../lib/tmdb";
 
+if (Astro.url.searchParams.get("page") === "1") return Astro.redirect("/top-imdb", 301);
 const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
 const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
 Astro.response.headers.set("Cache-Control", "public, s-maxage=900, stale-while-revalidate=86400");
 const client = new TmdbClient(getTmdbToken());
 const catalog = await client.getTopRated(page);
+if (catalog.totalPages > 0 && page > catalog.totalPages) return Astro.rewrite("/404");
 ---
 
-<BaseLayout title="Top Rated Movies - F.MOVIES" description="Browse the highest-rated movies in the F.MOVIES catalog, ranked by TMDB community rating.">
+<BaseLayout
+  title="Top Rated Movies — Community Picks & Details | F.MOVIES"
+  description="Explore highly rated movies in the F.MOVIES catalogue, ordered by TMDB community rating with cast, story details and recommendations for each title."
+  canonicalPath={canonicalPath("/top-imdb", catalog.page)}
+  paginationLinks={paginationLinks("/top-imdb", catalog.page, catalog.totalPages)}
+>
   <header class="page-heading">
     <div class="container">
       <span class="section-kicker">Audience favorites</span>

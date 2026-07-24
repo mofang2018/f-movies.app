@@ -1,0 +1,49 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+Astro.response.status = 404;
+---
+
+<BaseLayout
+  title="Page Not Found | F.MOVIES"
+  description="The requested F.MOVIES page could not be found. Search the catalogue or return to the movie and TV series discovery pages."
+  robots="noindex,follow"
+>
+  <section class="not-found container">
+    <span class="section-kicker">Error 404</span>
+    <h1>Page not found</h1>
+    <p>The link may be out of date, or the title may no longer be in the catalogue.</p>
+    <div class="not-found-actions">
+      <a class="button button-primary" href="/">Return to F.MOVIES</a>
+      <a class="button button-secondary" href="/movies">Browse movies</a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .not-found {
+    min-height: 58vh;
+    padding-top: 132px;
+    padding-bottom: 110px;
+  }
+
+  h1 {
+    margin: 9px 0 0;
+    font-size: clamp(40px, 6vw, 64px);
+    line-height: 1;
+  }
+
+  p {
+    max-width: 580px;
+    margin: 20px 0 0;
+    color: var(--color-muted);
+    font-size: 18px;
+  }
+
+  .not-found-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 28px;
+  }
+</style>

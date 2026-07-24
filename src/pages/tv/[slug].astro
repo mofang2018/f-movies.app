@@ -4,12 +4,12 @@ import { mediaIdFromSlug, mediaPath } from "../../lib/media-url";
 import { getTmdbToken, TmdbClient } from "../../lib/tmdb";
 
 const id = mediaIdFromSlug(Astro.params.slug);
-if (!id) return new Response(null, { status: 404 });
+if (!id) return Astro.rewrite("/404");
 Astro.response.headers.set("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
 const client = new TmdbClient(getTmdbToken());
 const details = await client.getDetails("tv", id);
 const canonicalPath = mediaPath("tv", details.id, details.title);
-if (Astro.url.pathname !== canonicalPath) return new Response(null, { status: 404 });
+if (Astro.url.pathname !== canonicalPath) return Astro.rewrite("/404");
 ---
 
 <DetailsPage details={details} />

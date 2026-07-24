@@ -5,18 +5,26 @@ import Pagination from "../../components/Pagination.astro";
 import { navigationCountries } from "../../data/navigation";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { CatalogClient } from "../../lib/catalog";
+import { canonicalPath, paginationLinks } from "../../lib/seo";
 
 const countrySlug = (Astro.params.code ?? "").toLowerCase();
 const country = navigationCountries.find((item) => item.slug === countrySlug);
-if (!country) return new Response(null, { status: 404 });
+if (!country) return Astro.rewrite("/404");
+if (Astro.url.searchParams.get("page") === "1") return Astro.redirect(`/country/${countrySlug}`, 301);
 const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
 const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
 Astro.response.headers.set("Cache-Control", "public, s-maxage=900, stale-while-revalidate=86400");
 const catalog = await new CatalogClient().getByCountry(country.code, page)
   ?? { page, totalPages: 0, totalResults: 0, results: [] };
+if (catalog.totalPages > 0 && page > catalog.totalPages) return Astro.rewrite("/404");
 ---
 
-<BaseLayout title={`${country.name} Movies - F.MOVIES`} description={`Browse popular movies from ${country.name}.`}>
+<BaseLayout
+  title={`${country.name} Movies — Ratings, Cast & More | F.MOVIES`}
+  description={`Browse movies from ${country.name} in the downloaded F.MOVIES catalogue, with story details, community ratings, cast information and recommendations.`}
+  canonicalPath={canonicalPath(`/country/${country.slug}`, catalog.page)}
+  paginationLinks={paginationLinks(`/country/${country.slug}`, catalog.page, catalog.totalPages)}
+>
   <header class="page-heading">
     <div class="container">
       <span class="section-kicker">Browse by country</span>

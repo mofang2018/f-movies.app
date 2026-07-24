@@ -22,14 +22,26 @@ const pageDescription = description.length > 160 ? `${description.slice(0, 157).
 const mediaLabel = details.mediaType === "movie" ? "Movie" : "TV Series";
 const structuredData = {
   "@context": "https://schema.org",
-  "@type": details.mediaType === "movie" ? "Movie" : "TVSeries",
-  name: details.title,
-  description: pageDescription,
-  url: new URL(canonicalPath, Astro.site).href,
-  ...(shareImage ? { image: shareImage } : {}),
-  ...(details.releaseDate ? { datePublished: details.releaseDate } : {}),
-  ...(details.genres.length ? { genre: details.genres.map((genre) => genre.name) } : {}),
-  ...(details.cast.length ? { actor: details.cast.map((person) => ({ "@type": "Person", name: person.name })) } : {}),
+  "@graph": [
+    {
+      "@type": details.mediaType === "movie" ? "Movie" : "TVSeries",
+      name: details.title,
+      description: pageDescription,
+      url: new URL(canonicalPath, Astro.site).href,
+      ...(shareImage ? { image: shareImage } : {}),
+      ...(details.releaseDate ? { datePublished: details.releaseDate } : {}),
+      ...(details.genres.length ? { genre: details.genres.map((genre) => genre.name) } : {}),
+      ...(details.cast.length ? { actor: details.cast.map((person) => ({ "@type": "Person", name: person.name })) } : {}),
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: new URL("/home", Astro.site).href },
+        { "@type": "ListItem", position: 2, name: details.mediaType === "movie" ? "Movies" : "TV Series", item: new URL(details.mediaType === "movie" ? "/movies" : "/tv-series", Astro.site).href },
+        { "@type": "ListItem", position: 3, name: details.title, item: new URL(canonicalPath, Astro.site).href },
+      ],
+    },
+  ],
 };
 ---
 
@@ -37,6 +49,8 @@ const structuredData = {
   title={`${details.title} (${year}) - ${mediaLabel} Details | F.MOVIES`}
   description={pageDescription}
   image={shareImage}
+  imageWidth={1280}
+  imageHeight={720}
   structuredData={structuredData}
 >
   <article class="details">

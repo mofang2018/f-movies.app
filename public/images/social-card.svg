@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">F.MOVIES</title>
+  <desc id="description">Discover movies and TV series with F.MOVIES.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#101419"/>
+      <stop offset="0.55" stop-color="#1d2927"/>
+      <stop offset="1" stop-color="#58751d"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="70%" cy="20%" r="72%">
+      <stop stop-color="#c8ee4b" stop-opacity=".68"/>
+      <stop offset="1" stop-color="#c8ee4b" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#background)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect x="72" y="72" width="8" height="486" rx="4" fill="#b7e32b"/>
+  <text x="116" y="214" fill="#b7e32b" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="700" letter-spacing="7">DISCOVER MORE</text>
+  <text x="116" y="340" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="800">F.MOVIES</text>
+  <text x="120" y="412" fill="#d9dfdf" font-family="Arial, Helvetica, sans-serif" font-size="38">Movies, TV series, cast and ratings.</text>
+</svg>

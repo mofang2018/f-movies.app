@@ -3,17 +3,32 @@ import EmptyState from "../components/EmptyState.astro";
 import MediaGrid from "../components/MediaGrid.astro";
 import Pagination from "../components/Pagination.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { paginationLinks } from "../lib/seo";
 import { getTmdbToken, TmdbClient } from "../lib/tmdb";
 
 const query = (Astro.url.searchParams.get("q") ?? "").trim().slice(0, 120);
+if (Astro.url.searchParams.get("page") === "1") {
+  return Astro.redirect(query ? `/search?q=${encodeURIComponent(query)}` : "/search", 301);
+}
 const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
 const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
 Astro.response.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=3600");
 const client = new TmdbClient(getTmdbToken());
 const catalog = await client.search(query, page);
+if (catalog.totalPages > 0 && page > catalog.totalPages) return Astro.rewrite("/404");
+const searchParams = new URLSearchParams(query ? { q: query } : {});
+if (catalog.page > 1) searchParams.set("page", String(catalog.page));
+const searchCanonical = searchParams.size ? `/search?${searchParams}` : "/search";
+const searchPaginationPath = query ? `/search?${new URLSearchParams({ q: query })}` : "/search";
 ---
 
-<BaseLayout title={`${query ? `Search: ${query}` : "Search"} - F.MOVIES`} description="Search movies and TV series.">
+<BaseLayout
+  title={`${query ? `Search: ${query}` : "Search Movies & TV Series"} | F.MOVIES`}
+  description={query ? `Search results for ${query} across the F.MOVIES movie and TV-series catalogue.` : "Search the F.MOVIES catalogue for movie and TV-series details, ratings, cast information and related recommendations."}
+  robots="noindex,follow"
+  canonicalPath={searchCanonical}
+  paginationLinks={paginationLinks(searchPaginationPath, catalog.page, catalog.totalPages)}
+>
   <header class="page-heading search-heading">
     <div class="container">
       <span class="section-kicker">Search the library</span>

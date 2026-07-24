@@ -7,36 +7,65 @@ interface Props {
   title?: string;
   description?: string;
   image?: string;
-  structuredData?: Record<string, unknown>;
+  imageWidth?: number;
+  imageHeight?: number;
+  robots?: string;
+  canonicalPath?: string;
+  paginationLinks?: Array<{ rel: "prev" | "next"; href: string }>;
+  structuredData?: Record<string, unknown> | Array<Record<string, unknown>>;
 }
 
 const {
   title = "F.MOVIES - Discover Movies and TV Series",
   description = "Explore trending movies, popular TV series, cast details and recommendations powered by TMDB.",
-  image,
+  image: suppliedImage,
+  imageWidth = 1200,
+  imageHeight = 630,
+  robots = "index,follow",
+  canonicalPath = Astro.url.pathname,
+  paginationLinks = [],
   structuredData,
 } = Astro.props;
-const canonical = new URL(Astro.url.pathname, Astro.site);
-const jsonLd = structuredData ? JSON.stringify(structuredData).replace(/</g, "\\u003c") : undefined;
+const canonical = new URL(canonicalPath, Astro.site);
+const image = suppliedImage ?? new URL("/images/social-card.svg", Astro.site).href;
+const jsonLdData = structuredData ?? {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  name: title,
+  description,
+  url: canonical.href,
+};
+const jsonLd = JSON.stringify(jsonLdData).replace(/</g, "\\u003c");
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
+    <meta name="robots" content={robots} />
     <meta name="theme-color" content="#13151a" />
     <link rel="canonical" href={canonical} />
+    {paginationLinks.map((link) => <link rel={link.rel} href={link.href} />)}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="F.MOVIES" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
-    {image && <meta property="og:image" content={image} />}
+    <meta property="og:image" content={image} />
+    <meta property="og:image:width" content={String(imageWidth)} />
+    <meta property="og:image:height" content={String(imageHeight)} />
     <meta name="twitter:card" content="summary_large_image" />
-    {jsonLd && <script is:inline type="application/ld+json" set:html={jsonLd}></script>}
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={image} />
+    <script is:inline type="application/ld+json" set:html={jsonLd}></script>
     <title>{title}</title>
   </head>
   <body>

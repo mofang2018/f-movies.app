@@ -27,7 +27,8 @@ const slides = items.length > 0 ? items : Astro.props.items.slice(0, 1);
       <div class="hero-overlay" aria-hidden="true"></div>
       <div class="hero-content container">
         <span class="hero-kicker">Featured {item.mediaType === "movie" ? "Movie" : "Series"}</span>
-        <h1>{item.title}</h1>
+        {index === 0 && <h1 class="hero-page-title">Discover movies and TV series</h1>}
+        <h2 class="hero-title">{item.title}</h2>
         <div class="hero-meta">
           <strong>HD</strong>
           <span><CalendarDays size={15} /> {item.releaseDate.slice(0, 4) || "TBA"}</span>
@@ -150,7 +151,17 @@ const slides = items.length > 0 ? items : Astro.props.items.slice(0, 1);
     text-transform: uppercase;
   }
 
-  h1 {
+  .hero-page-title {
+    margin: 0 0 8px;
+    color: #e4e8dc;
+    font-size: 15px;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .hero-title {
     margin: 0;
     font-size: clamp(46px, 5vw, 68px);
     font-weight: 850;
@@ -250,7 +261,7 @@ const slides = items.length > 0 ? items : Astro.props.items.slice(0, 1);
       padding-bottom: 76px;
     }
 
-    h1 {
+    .hero-title {
       font-size: clamp(36px, 10vw, 46px);
     }
 

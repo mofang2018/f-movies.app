@@ -2,16 +2,24 @@
 import MediaGrid from "../components/MediaGrid.astro";
 import Pagination from "../components/Pagination.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { canonicalPath, paginationLinks } from "../lib/seo";
 import { getTmdbToken, TmdbClient } from "../lib/tmdb";
 
+if (Astro.url.searchParams.get("page") === "1") return Astro.redirect("/movies", 301);
 const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
 const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
 Astro.response.headers.set("Cache-Control", "public, s-maxage=900, stale-while-revalidate=86400");
 const client = new TmdbClient(getTmdbToken());
 const catalog = await client.getPopular("movie", page);
+if (catalog.totalPages > 0 && page > catalog.totalPages) return Astro.rewrite("/404");
 ---
 
-<BaseLayout title="Popular Movies - F.MOVIES" description="Browse popular movies and discover your next watch.">
+<BaseLayout
+  title="Popular Movies to Discover — Ratings, Cast & More | F.MOVIES"
+  description="Browse popular movies with story details, community ratings, cast information and recommendations to help you decide what to discover next on F.MOVIES."
+  canonicalPath={canonicalPath("/movies", catalog.page)}
+  paginationLinks={paginationLinks("/movies", catalog.page, catalog.totalPages)}
+>
   <header class="page-heading">
     <div class="container">
       <span class="section-kicker">Movie library</span>
