@@ -1,20 +1,21 @@
 ---
-const movieLinks = [
-  { href: "/movies", label: "Popular Movies" },
+const genreLinks = [
   { href: "/genre/28", label: "Action" },
   { href: "/genre/35", label: "Comedy" },
-  { href: "/genre/18", label: "Drama" },
-];
-const tvLinks = [
-  { href: "/tv-series", label: "Popular TV Series" },
-  { href: "/search?q=animation", label: "Animation" },
-  { href: "/search?q=documentary", label: "Documentary" },
+  { href: "/genre/27", label: "Horror" },
+  { href: "/genre/878", label: "Sci-Fi" },
+  { href: "/genre/16", label: "Animation" },
 ];
 const countryLinks = [
   { href: "/country/united-states", label: "United States" },
   { href: "/country/united-kingdom", label: "United Kingdom" },
+  { href: "/country/canada", label: "Canada" },
+  { href: "/country/australia", label: "Australia" },
   { href: "/country/japan", label: "Japan" },
-  { href: "/country/south-korea", label: "South Korea" },
+];
+const freeMovieLinks = [
+  { href: "/movies", label: "Movies" },
+  { href: "/tv-series", label: "TV-Series" },
 ];
 ---
 
@@ -25,17 +26,17 @@ const countryLinks = [
       <p>Discover movies and TV series through a calm, fast interface.</p>
       <p class="disclaimer">F.MOVIES does not host or stream video files.</p>
     </section>
-    <nav aria-label="Movie links">
-      <h2>Movies</h2>
-      {movieLinks.map((item) => <a href={item.href}>{item.label}</a>)}
-    </nav>
-    <nav aria-label="TV links">
-      <h2>TV Series</h2>
-      {tvLinks.map((item) => <a href={item.href}>{item.label}</a>)}
+    <nav aria-label="Genre links">
+      <h2>Genres</h2>
+      {genreLinks.map((item) => <a href={item.href}>{item.label}</a>)}
     </nav>
     <nav aria-label="Country links">
       <h2>Country</h2>
       {countryLinks.map((item) => <a href={item.href}>{item.label}</a>)}
+    </nav>
+    <nav aria-label="Free movie links">
+      <h2>Free Movies</h2>
+      {freeMovieLinks.map((item) => <a href={item.href}>{item.label}</a>)}
     </nav>
   </div>
   <div class="footer-bottom container">
