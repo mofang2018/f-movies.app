@@ -6,9 +6,15 @@ const movieLinks = [
   { href: "/genre/18", label: "Drama" },
 ];
 const tvLinks = [
-  { href: "/tv-series", label: "TV Series" },
+  { href: "/tv-series", label: "Popular TV Series" },
   { href: "/search?q=animation", label: "Animation" },
   { href: "/search?q=documentary", label: "Documentary" },
+];
+const countryLinks = [
+  { href: "/country/united-states", label: "United States" },
+  { href: "/country/united-kingdom", label: "United Kingdom" },
+  { href: "/country/japan", label: "Japan" },
+  { href: "/country/south-korea", label: "South Korea" },
 ];
 ---
 
@@ -16,26 +22,25 @@ const tvLinks = [
   <div class="footer-grid container">
     <section class="footer-brand" aria-labelledby="footer-brand-title">
       <h2 id="footer-brand-title">F<span>.</span>MOVIES</h2>
-      <p>Discover movies and TV series through a calm, fast interface powered by TMDB.</p>
-      <p class="disclaimer">F.MOVIES does not host or stream video files. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+      <p>Discover movies and TV series through a calm, fast interface.</p>
+      <p class="disclaimer">F.MOVIES does not host or stream video files.</p>
     </section>
     <nav aria-label="Movie links">
       <h2>Movies</h2>
       {movieLinks.map((item) => <a href={item.href}>{item.label}</a>)}
     </nav>
     <nav aria-label="TV links">
-      <h2>Explore</h2>
+      <h2>TV Series</h2>
       {tvLinks.map((item) => <a href={item.href}>{item.label}</a>)}
     </nav>
-    <nav aria-label="Information links">
-      <h2>Information</h2>
-      <a href="https://www.themoviedb.org/" rel="noreferrer">TMDB</a>
-      <a href="mailto:hello@f-movies.app">Contact</a>
-      <a href="/search">Search</a>
+    <nav aria-label="Country links">
+      <h2>Country</h2>
+      {countryLinks.map((item) => <a href={item.href}>{item.label}</a>)}
     </nav>
   </div>
   <div class="footer-bottom container">
-    <p>© {new Date().getFullYear()} F.MOVIES. Movie metadata provided by TMDB.</p>
+    <p>© {new Date().getFullYear()} F.MOVIES. All rights reserved.</p>
+    <a href="/dmca">DMCA</a>
   </div>
 </footer>
 
@@ -101,6 +106,10 @@ const tvLinks = [
   }
 
   .footer-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
     padding-top: 20px;
     padding-bottom: 20px;
     border-top: 1px solid var(--color-border);
@@ -110,6 +119,16 @@ const tvLinks = [
     margin: 0;
     color: var(--color-subtle);
     font-size: 12px;
+  }
+
+  .footer-bottom a {
+    color: var(--color-muted);
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .footer-bottom a:hover {
+    color: var(--color-accent);
   }
 
   @media (max-width: 880px) {

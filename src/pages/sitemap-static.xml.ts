@@ -32,6 +32,7 @@ export const GET: APIRoute = async () => {
     "/movies",
     "/tv-series",
     "/top-imdb",
+    "/dmca",
     ...genres.map((genre) => `/genre/${genre.genre_id}`),
     ...countries.map((country) => countrySlugs.get(country.country_code)).filter(Boolean).map((slug) => `/country/${slug}`),
   ];

@@ -1,0 +1,71 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="DMCA Notice | F.MOVIES"
+  description="Submit a copyright concern or DMCA notice to F.MOVIES."
+  canonicalPath="/dmca"
+>
+  <section class="page-heading">
+    <div class="container">
+      <span class="section-kicker">Copyright</span>
+      <h1>DMCA notice</h1>
+      <p>How to report a copyright concern related to F.MOVIES.</p>
+    </div>
+  </section>
+
+  <article class="dmca-content container">
+    <p>F.MOVIES is a movie and TV-series discovery catalogue. We do not host, upload, store, or stream video files.</p>
+
+    <h2>Copyright concerns</h2>
+    <p>If you believe content available on this website infringes your copyright, email <a href="mailto:hello@f-movies.app?subject=DMCA%20notice">hello@f-movies.app</a> with:</p>
+    <ul>
+      <li>Your full name and contact details.</li>
+      <li>A clear identification of the copyrighted work.</li>
+      <li>The exact F.MOVIES URL you are reporting.</li>
+      <li>A statement that you have a good-faith belief the use is not authorised.</li>
+      <li>A statement that the information in your notice is accurate, and that you are authorised to act for the copyright owner.</li>
+      <li>Your electronic or physical signature.</li>
+    </ul>
+
+    <h2>What happens next</h2>
+    <p>We review complete notices promptly. Where appropriate, we may remove or restrict the reported catalogue reference while we assess the request.</p>
+
+    <h2>Counter notices</h2>
+    <p>If you believe a catalogue reference was removed in error, contact us at the same address with your explanation and supporting information.</p>
+  </article>
+</BaseLayout>
+
+<style>
+  .dmca-content {
+    max-width: 820px;
+    padding-top: 56px;
+    padding-bottom: 84px;
+    color: var(--color-muted);
+    font-size: 16px;
+    line-height: 1.75;
+  }
+
+  .dmca-content > :first-child { margin-top: 0; }
+
+  .dmca-content h2 {
+    margin: 38px 0 10px;
+    color: var(--color-text);
+    font-size: 22px;
+    line-height: 1.2;
+  }
+
+  .dmca-content p { margin: 14px 0; }
+
+  .dmca-content ul {
+    margin: 14px 0;
+    padding-left: 24px;
+  }
+
+  .dmca-content a {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+</style>
