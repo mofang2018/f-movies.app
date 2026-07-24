@@ -81,7 +81,7 @@ function isValidImagePath(path: string): boolean {
   return /^\/[a-zA-Z0-9_-]+\.(?:avif|jpe?g|png|webp)$/.test(path);
 }
 
-const cachedImageSizes = { poster: "w500", backdrop: "w1280", profile: "w185" } as const;
+const cachedImageSizes = { poster: "w342", backdrop: "w1280", profile: "w185" } as const;
 
 function imageKey(message: ImageMessage): string {
   return `tmdb/${message.imageType}/${cachedImageSizes[message.imageType]}/${message.path.slice(1)}`;

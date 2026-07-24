@@ -2,6 +2,8 @@ import { env } from "cloudflare:workers";
 import type { Genre, HomeData, MediaCredit, MediaDetails, MediaItem, MediaType, PagedMedia } from "../types/media";
 
 const pageSize = 20;
+const mediaColumns = "media_type, tmdb_id, title, overview, release_date, vote_average, poster_path, backdrop_path, runtime, seasons, status";
+const mediaColumnsFor = (alias: string): string => mediaColumns.split(", ").map((column) => `${alias}.${column}`).join(", ");
 
 interface CatalogMediaRow {
   media_type: MediaType;
@@ -49,11 +51,17 @@ function toMedia(row: CatalogMediaRow, genreIds: number[] = []): MediaItem {
 
 async function rowsWithGenres(rows: CatalogMediaRow[], database: D1Database): Promise<MediaItem[]> {
   if (!rows.length) return [];
-  const statements = rows.map((row) => database.prepare(
-    "SELECT genre_id FROM media_genres WHERE media_type = ? AND tmdb_id = ? ORDER BY genre_id",
-  ).bind(row.media_type, row.tmdb_id));
-  const results = await database.batch<{ genre_id: number }>(statements);
-  return rows.map((row, index) => toMedia(row, results[index].results.map((genre) => genre.genre_id)));
+  const predicates = rows.map(() => "(media_type = ? AND tmdb_id = ?)").join(" OR ");
+  const binds = rows.flatMap((row) => [row.media_type, row.tmdb_id]);
+  const genres = await database.prepare(
+    `SELECT media_type, tmdb_id, genre_id FROM media_genres WHERE ${predicates} ORDER BY media_type, tmdb_id, genre_id`,
+  ).bind(...binds).all<{ media_type: MediaType; tmdb_id: number; genre_id: number }>();
+  const genreIdsByMedia = new Map<string, number[]>();
+  for (const genre of genres.results) {
+    const key = `${genre.media_type}:${genre.tmdb_id}`;
+    genreIdsByMedia.set(key, [...(genreIdsByMedia.get(key) ?? []), genre.genre_id]);
+  }
+  return rows.map((row) => toMedia(row, genreIdsByMedia.get(`${row.media_type}:${row.tmdb_id}`) ?? []));
 }
 
 async function countAndRows(
@@ -67,8 +75,8 @@ async function countAndRows(
   const offset = (safePage - 1) * pageSize;
   const [countResult, rowsResult] = await database.batch([
     database.prepare(`SELECT COUNT(*) AS total FROM media ${where}`).bind(...binds),
-    database.prepare(`SELECT media_type, tmdb_id, title, overview, release_date, vote_average, poster_path, backdrop_path, runtime, seasons, status
-      FROM media ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`).bind(...binds, pageSize, offset),
+    database.prepare(`SELECT ${mediaColumns} FROM media ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
+      .bind(...binds, pageSize, offset),
   ]);
   const total = Number((countResult.results[0] as { total?: number } | undefined)?.total ?? 0);
   const rows = rowsResult.results as CatalogMediaRow[];
@@ -89,16 +97,23 @@ export class CatalogClient {
     const database = db();
     if (!database) return null;
     const [trending, movies, tv, genres] = await Promise.all([
-      countAndRows(database, "", [], "popularity DESC", 1),
-      countAndRows(database, "WHERE media_type = ?", ["movie"], "popularity DESC", 1),
-      countAndRows(database, "WHERE media_type = ?", ["tv"], "popularity DESC", 1),
+      database.prepare(`SELECT ${mediaColumns} FROM media ORDER BY popularity DESC LIMIT ?`).bind(pageSize).all<CatalogMediaRow>(),
+      database.prepare(`SELECT ${mediaColumns} FROM media WHERE media_type = ? ORDER BY popularity DESC LIMIT ?`)
+        .bind("movie", pageSize).all<CatalogMediaRow>(),
+      database.prepare(`SELECT ${mediaColumns} FROM media WHERE media_type = ? ORDER BY popularity DESC LIMIT ?`)
+        .bind("tv", pageSize).all<CatalogMediaRow>(),
       database.prepare("SELECT genre_id, name FROM genres ORDER BY name").all<CatalogGenreRow>(),
     ]);
-    if (!trending.totalResults) return null;
+    if (!trending.results.length) return null;
+    const [trendingItems, movieItems, tvItems] = await Promise.all([
+      rowsWithGenres(trending.results, database),
+      rowsWithGenres(movies.results, database),
+      rowsWithGenres(tv.results, database),
+    ]);
     return {
-      trending: trending.results,
-      movies: movies.results,
-      tv: tv.results,
+      trending: trendingItems,
+      movies: movieItems,
+      tv: tvItems,
       genres: genres.results.map((genre) => ({ id: genre.genre_id, name: genre.name })),
     };
   }
@@ -117,7 +132,7 @@ export class CatalogClient {
     const offset = (safePage - 1) * pageSize;
     const [countResult, rowsResult] = await database.batch([
       database.prepare("SELECT COUNT(*) AS total FROM media_genres WHERE genre_id = ?").bind(genreId),
-      database.prepare(`SELECT m.media_type, m.tmdb_id, m.title, m.overview, m.release_date, m.vote_average, m.poster_path, m.backdrop_path, m.runtime, m.seasons, m.status
+      database.prepare(`SELECT ${mediaColumnsFor("m")}
         FROM media m JOIN media_genres mg ON mg.media_type = m.media_type AND mg.tmdb_id = m.tmdb_id
         WHERE mg.genre_id = ? ORDER BY m.popularity DESC LIMIT ? OFFSET ?`).bind(genreId, pageSize, offset),
     ]);
@@ -139,7 +154,7 @@ export class CatalogClient {
     const offset = (safePage - 1) * pageSize;
     const [countResult, rowsResult] = await database.batch([
       database.prepare("SELECT COUNT(*) AS total FROM media_countries WHERE country_code = ? AND media_type = 'movie'").bind(countryCode),
-      database.prepare(`SELECT m.media_type, m.tmdb_id, m.title, m.overview, m.release_date, m.vote_average, m.poster_path, m.backdrop_path, m.runtime, m.seasons, m.status
+      database.prepare(`SELECT ${mediaColumnsFor("m")}
         FROM media m JOIN media_countries mc ON mc.media_type = m.media_type AND mc.tmdb_id = m.tmdb_id
         WHERE mc.country_code = ? AND m.media_type = 'movie' ORDER BY m.popularity DESC LIMIT ? OFFSET ?`).bind(countryCode, pageSize, offset),
     ]);
@@ -177,22 +192,40 @@ export class CatalogClient {
   async search(query: string, page: number): Promise<PagedMedia | null> {
     const database = db();
     if (!database || !query) return null;
-    return countAndRows(database, "WHERE title LIKE ?", [`%${query}%`], "popularity DESC", page);
+    const normalizedQuery = query.trim().replace(/[^\p{L}\p{N}]+/gu, " ");
+    if (!normalizedQuery) return null;
+    const match = normalizedQuery.split(/\s+/).map((term) => `"${term}"*`).join(" AND ");
+    const safePage = Math.max(1, page);
+    const offset = (safePage - 1) * pageSize;
+    const [countResult, rowsResult] = await database.batch([
+      database.prepare("SELECT COUNT(*) AS total FROM media_search WHERE media_search MATCH ?").bind(match),
+      database.prepare(`SELECT ${mediaColumns} FROM media
+        JOIN media_search ON media_search.rowid = media.rowid
+        WHERE media_search MATCH ? ORDER BY media.popularity DESC LIMIT ? OFFSET ?`).bind(match, pageSize, offset),
+    ]);
+    const total = Number((countResult.results[0] as { total?: number } | undefined)?.total ?? 0);
+    const rows = rowsResult.results as CatalogMediaRow[];
+    return {
+      page: safePage,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      totalResults: total,
+      results: await rowsWithGenres(rows, database),
+    };
   }
 
   async getDetails(mediaType: MediaType, id: number): Promise<MediaDetails | null> {
     const database = db();
     if (!database) return null;
-    const media = await database.prepare(`SELECT media_type, tmdb_id, title, overview, release_date, vote_average, poster_path, backdrop_path, runtime, seasons, status
-      FROM media WHERE media_type = ? AND tmdb_id = ?`).bind(mediaType, id).first<CatalogMediaRow>();
+    const media = await database.prepare(`SELECT ${mediaColumns} FROM media WHERE media_type = ? AND tmdb_id = ?`)
+      .bind(mediaType, id).first<CatalogMediaRow>();
     if (!media) return null;
     const [genresResult, castResult, similarResult] = await database.batch([
       database.prepare(`SELECT g.genre_id, g.name FROM genres g JOIN media_genres mg ON mg.genre_id = g.genre_id
         WHERE mg.media_type = ? AND mg.tmdb_id = ? ORDER BY g.name`).bind(mediaType, id),
       database.prepare("SELECT person_id, name, character_name, profile_path FROM media_cast WHERE media_type = ? AND tmdb_id = ? ORDER BY cast_order LIMIT 10")
         .bind(mediaType, id),
-      database.prepare(`SELECT media_type, tmdb_id, title, overview, release_date, vote_average, poster_path, backdrop_path, runtime, seasons, status
-        FROM media WHERE media_type = ? AND tmdb_id != ? ORDER BY popularity DESC LIMIT 12`).bind(mediaType, id),
+      database.prepare(`SELECT ${mediaColumns} FROM media WHERE media_type = ? AND tmdb_id != ? ORDER BY popularity DESC LIMIT 12`)
+        .bind(mediaType, id),
     ]);
     const genres = (genresResult.results as CatalogGenreRow[]).map((genre) => ({ id: genre.genre_id, name: genre.name }));
     const cast: MediaCredit[] = (castResult.results as CatalogCastRow[]).map((person) => ({
