@@ -3,6 +3,9 @@
   "name": "f-movies-images",
   "main": "workers/image-proxy.ts",
   "compatibility_date": "2026-07-22",
+  "r2_buckets": [
+    { "binding": "TMDB_IMAGES", "bucket_name": "f-movies-tmdb-images" }
+  ],
   "observability": {
     "enabled": true
   }

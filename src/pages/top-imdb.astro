@@ -11,12 +11,12 @@ const client = new TmdbClient(getTmdbToken());
 const catalog = await client.getTopRated(page);
 ---
 
-<BaseLayout title="Top IMDb Movies - F.MOVIES" description="Browse the highest-rated movies in the F.MOVIES catalog.">
+<BaseLayout title="Top Rated Movies - F.MOVIES" description="Browse the highest-rated movies in the F.MOVIES catalog, ranked by TMDB community rating.">
   <header class="page-heading">
     <div class="container">
       <span class="section-kicker">Audience favorites</span>
-      <h1>Top IMDb</h1>
-      <p>Explore acclaimed movies ranked by audience rating.</p>
+      <h1>Top Rated</h1>
+      <p>Explore acclaimed movies ranked by TMDB community rating.</p>
     </div>
   </header>
   <div class="page-content container">

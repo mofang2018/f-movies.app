@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { CatalogClient } from "./catalog";
 import {
   fallbackCountryPage,
   fallbackDetails,
@@ -85,6 +86,8 @@ export function getTmdbToken(): string {
 }
 
 export class TmdbClient {
+  private readonly catalog = new CatalogClient();
+
   constructor(private readonly token: string) {}
 
   private async request<T>(path: string, params: Record<string, string | number> = {}, cacheTtl = 3600): Promise<T> {
@@ -108,6 +111,12 @@ export class TmdbClient {
   }
 
   async getHome(): Promise<HomeData> {
+    try {
+      const catalog = await this.catalog.getHome();
+      if (catalog) return catalog;
+    } catch {
+      // The downloaded catalog is an optimization, not a single point of failure.
+    }
     if (!this.token) return fallbackHome;
     try {
       const [trending, movies, tv, genres] = await Promise.all([
@@ -128,6 +137,12 @@ export class TmdbClient {
   }
 
   async getPopular(mediaType: MediaType, page: number): Promise<PagedMedia> {
+    try {
+      const catalog = await this.catalog.getPopular(mediaType, page);
+      if (catalog) return catalog;
+    } catch {
+      // Continue with the existing TMDB and JSON fallbacks.
+    }
     if (!this.token) return fallbackPage(mediaType, page);
     try {
       const raw = await this.request<TmdbPagedRaw>(`/${mediaType}/popular`, { page });
@@ -138,6 +153,12 @@ export class TmdbClient {
   }
 
   async getByGenre(genreId: number, page: number): Promise<PagedMedia> {
+    try {
+      const catalog = await this.catalog.getByGenre(genreId, page);
+      if (catalog) return catalog;
+    } catch {
+      // Continue with the existing TMDB and JSON fallbacks.
+    }
     if (!this.token) return fallbackGenrePage(genreId, page);
     try {
       const raw = await this.request<TmdbPagedRaw>("/discover/movie", {
@@ -166,6 +187,12 @@ export class TmdbClient {
   }
 
   async getTopRated(page: number): Promise<PagedMedia> {
+    try {
+      const catalog = await this.catalog.getTopRated(page);
+      if (catalog) return catalog;
+    } catch {
+      // Continue with the existing TMDB and JSON fallbacks.
+    }
     if (!this.token) return fallbackTopRatedPage(page);
     try {
       const raw = await this.request<TmdbPagedRaw>("/movie/top_rated", { page });
@@ -176,6 +203,12 @@ export class TmdbClient {
   }
 
   async getGenres(): Promise<Genre[]> {
+    try {
+      const genres = await this.catalog.getGenres();
+      if (genres) return genres;
+    } catch {
+      // Continue with the existing TMDB and JSON fallbacks.
+    }
     if (!this.token) return fallbackGenres;
     try {
       const raw = await this.request<{ genres: Genre[] }>("/genre/movie/list", {}, 86400);
@@ -187,6 +220,12 @@ export class TmdbClient {
 
   async search(query: string, page: number): Promise<PagedMedia> {
     if (!query) return { page: 1, totalPages: 0, totalResults: 0, results: [] };
+    try {
+      const catalog = await this.catalog.search(query, page);
+      if (catalog) return catalog;
+    } catch {
+      // Continue with the existing TMDB and JSON fallbacks.
+    }
     if (!this.token) {
       const all = [...fallbackHome.movies, ...fallbackHome.tv];
       const results = all.filter((item) => item.title.toLowerCase().includes(query.toLowerCase()));
@@ -201,6 +240,12 @@ export class TmdbClient {
   }
 
   async getDetails(mediaType: MediaType, id: number): Promise<MediaDetails> {
+    try {
+      const catalog = await this.catalog.getDetails(mediaType, id);
+      if (catalog) return catalog;
+    } catch {
+      // Continue with the existing TMDB and JSON fallbacks.
+    }
     if (!this.token) return fallbackDetails(mediaType, id);
     try {
       const raw = await this.request<TmdbMediaRaw>(`/${mediaType}/${id}`, {

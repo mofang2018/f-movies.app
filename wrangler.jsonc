@@ -7,7 +7,14 @@
   "observability": {
     "enabled": true
   },
+  "d1_databases": [
+    {
+      "binding": "CATALOG_DB",
+      "database_name": "f-movies-catalog",
+      "database_id": "0f662055-f012-4f1c-9570-c0760488f5ca"
+    }
+  ],
   "vars": {
-    "PUBLIC_IMAGE_CDN_URL": "https://images.f-movies.app"
+    "PUBLIC_IMAGE_CDN_URL": "https://f-movies-images.ericfang2013.workers.dev"
   }
 }
