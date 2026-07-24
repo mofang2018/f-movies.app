@@ -2,6 +2,7 @@
 import { CalendarDays, Clock3, Play, Star, X } from "@lucide/astro";
 import { getImageUrl } from "../lib/images";
 import { mediaPath } from "../lib/media-url";
+import { genrePath } from "../lib/genre-url";
 import type { MediaDetails } from "../types/media";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import MediaSection from "./MediaSection.astro";
@@ -74,7 +75,7 @@ const structuredData = {
           </div>
           <p class="overview">{description}</p>
           <div class="genres">
-            {details.genres.map((genre) => <a href={`/genre/${genre.id}`}>{genre.name}</a>)}
+            {details.genres.map((genre) => <a href={genrePath(genre)}>{genre.name}</a>)}
           </div>
           <div class="details-actions">
             {trailerEmbedUrl ? (

@@ -1,5 +1,6 @@
 ---
 import { ArrowRight } from "@lucide/astro";
+import { genrePath } from "../lib/genre-url";
 import type { Genre } from "../types/media";
 
 interface Props {
@@ -19,7 +20,7 @@ const { genres } = Astro.props;
       <a href="/movies">All movies <ArrowRight size={16} /></a>
     </div>
     <div class="genre-list">
-      {genres.slice(0, 12).map((genre) => <a href={`/genre/${genre.id}`}>{genre.name}</a>)}
+      {genres.slice(0, 12).map((genre) => <a href={genrePath(genre)}>{genre.name}</a>)}
     </div>
   </div>
 </section>

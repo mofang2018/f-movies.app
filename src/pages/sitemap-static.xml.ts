@@ -1,10 +1,12 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { navigationCountries } from "../data/navigation";
+import { genrePath } from "../lib/genre-url";
 import { absoluteUrl, sitemapCacheControl, xml } from "../lib/seo";
 
 interface GenreRow {
   genre_id: number;
+  name: string;
 }
 
 interface CountryRow {
@@ -20,7 +22,7 @@ export const GET: APIRoute = async () => {
   const database = (env as RuntimeEnv).CATALOG_DB;
   if (!database) return new Response("Catalog unavailable", { status: 503 });
   const [genresResult, countriesResult] = await database.batch([
-    database.prepare("SELECT DISTINCT genre_id FROM media_genres ORDER BY genre_id"),
+    database.prepare("SELECT genre_id, name FROM genres ORDER BY name"),
     database.prepare("SELECT DISTINCT country_code FROM media_countries WHERE media_type = 'movie' ORDER BY country_code"),
   ]);
   const genres = genresResult.results as GenreRow[];
@@ -33,7 +35,7 @@ export const GET: APIRoute = async () => {
     "/tv-series",
     "/top-imdb",
     "/dmca",
-    ...genres.map((genre) => `/genre/${genre.genre_id}`),
+    ...genres.map((genre) => genrePath({ name: genre.name })),
     ...countries.map((country) => countrySlugs.get(country.country_code)).filter(Boolean).map((slug) => `/country/${slug}`),
   ];
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${paths

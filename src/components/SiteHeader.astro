@@ -1,5 +1,6 @@
 ---
 import { ChevronDown, Menu, Search, X } from "@lucide/astro";
+import { genrePath } from "../lib/genre-url";
 import { fallbackGenres } from "../data/fallback";
 import { navigationCountries } from "../data/navigation";
 
@@ -24,7 +25,7 @@ const isCountryActive = currentPath.startsWith("/country/");
       <details class:list={["nav-dropdown", { active: isGenreActive }]}>
         <summary>Genres <ChevronDown size={14} /></summary>
         <div class="dropdown-panel genre-panel">
-          {genres.map((genre) => <a href={`/genre/${genre.id}`}>{genre.name}</a>)}
+          {genres.map((genre) => <a href={genrePath(genre)}>{genre.name}</a>)}
         </div>
       </details>
 
@@ -63,7 +64,7 @@ const isCountryActive = currentPath.startsWith("/country/");
       <details open={isGenreActive}>
         <summary>Genres <ChevronDown size={15} /></summary>
         <div class="mobile-submenu">
-          {genres.map((genre) => <a href={`/genre/${genre.id}`}>{genre.name}</a>)}
+          {genres.map((genre) => <a href={genrePath(genre)}>{genre.name}</a>)}
         </div>
       </details>
       <details open={isCountryActive}>

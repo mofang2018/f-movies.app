@@ -1,0 +1,41 @@
+---
+import MediaGrid from "../../components/MediaGrid.astro";
+import Pagination from "../../components/Pagination.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { genrePath, genreSlug } from "../../lib/genre-url";
+import { canonicalPath, catalogCacheControl, paginationLinks } from "../../lib/seo";
+import { getTmdbToken, TmdbClient } from "../../lib/tmdb";
+
+const slug = Astro.params.slug;
+if (!slug || !/^[a-z]+(?:-[a-z]+)*$/.test(slug)) return Astro.rewrite("/404");
+const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
+const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
+Astro.response.headers.set("Cache-Control", catalogCacheControl);
+const client = new TmdbClient(getTmdbToken());
+const genres = await client.getGenres();
+const genre = genres.find((item) => genreSlug(item.name) === slug);
+if (!genre) return Astro.rewrite("/404");
+const basePath = genrePath(genre);
+if (Astro.url.searchParams.get("page") === "1") return Astro.redirect(basePath, 301);
+const catalog = await client.getByGenre(genre.id, page);
+if (catalog.totalPages > 0 && page > catalog.totalPages) return Astro.rewrite("/404");
+---
+
+<BaseLayout
+  title={`${genre.name} Movies — Ratings, Cast & More | F.MOVIES`}
+  description={`Browse ${genre.name.toLowerCase()} movies with community ratings, story details, cast information and recommendations from the F.MOVIES catalogue.`}
+  canonicalPath={canonicalPath(basePath, catalog.page)}
+  paginationLinks={paginationLinks(basePath, catalog.page, catalog.totalPages)}
+>
+  <header class="page-heading">
+    <div class="container">
+      <span class="section-kicker">Browse by genre</span>
+      <h1>{genre.name} movies</h1>
+      <p>Popular and noteworthy titles in {genre.name.toLowerCase()}.</p>
+    </div>
+  </header>
+  <div class="page-content container">
+    <MediaGrid items={catalog.results} priorityCount={6} />
+    <Pagination page={catalog.page} totalPages={catalog.totalPages} pathname={basePath} />
+  </div>
+</BaseLayout>
