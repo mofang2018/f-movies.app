@@ -1,0 +1,62 @@
+---
+import EmptyState from "../components/EmptyState.astro";
+import MediaGrid from "../components/MediaGrid.astro";
+import Pagination from "../components/Pagination.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getTmdbToken, TmdbClient } from "../lib/tmdb";
+
+const query = (Astro.url.searchParams.get("q") ?? "").trim().slice(0, 120);
+const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
+const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
+Astro.response.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=3600");
+const client = new TmdbClient(getTmdbToken());
+const catalog = await client.search(query, page);
+---
+
+<BaseLayout title={`${query ? `Search: ${query}` : "Search"} - F.MOVIES`} description="Search movies and TV series.">
+  <header class="page-heading search-heading">
+    <div class="container">
+      <span class="section-kicker">Search the library</span>
+      <h1>{query ? `Results for “${query}”` : "Find a title"}</h1>
+      <p>{query ? `${catalog.totalResults.toLocaleString()} matching titles found.` : "Search movies and TV series by title."}</p>
+      <form action="/search" method="get">
+        <label class="screen-reader-only" for="page-query">Search movies and TV series</label>
+        <input id="page-query" type="search" name="q" value={query} placeholder="Movie or TV series title..." autofocus={!query} />
+        <button class="button button-primary" type="submit">Search</button>
+      </form>
+    </div>
+  </header>
+  <div class="page-content container">
+    {catalog.results.length > 0 ? (
+      <>
+        <MediaGrid items={catalog.results} priorityCount={6} />
+        <Pagination page={catalog.page} totalPages={catalog.totalPages} pathname="/search" query={{ q: query }} />
+      </>
+    ) : <EmptyState query={query} />}
+  </div>
+</BaseLayout>
+
+<style>
+  .search-heading form {
+    display: flex;
+    width: min(100%, 650px);
+    gap: 9px;
+    margin-top: 24px;
+  }
+
+  .search-heading input {
+    min-width: 0;
+    flex: 1;
+    height: 44px;
+    padding: 0 15px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    outline: 0;
+    background: var(--color-surface);
+    color: #fff;
+  }
+
+  .search-heading input:focus {
+    border-color: var(--color-accent);
+  }
+</style>

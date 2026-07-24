@@ -1,0 +1,136 @@
+---
+const movieLinks = [
+  { href: "/movies", label: "Popular Movies" },
+  { href: "/genre/28", label: "Action" },
+  { href: "/genre/35", label: "Comedy" },
+  { href: "/genre/18", label: "Drama" },
+];
+const tvLinks = [
+  { href: "/tv-series", label: "TV Series" },
+  { href: "/search?q=animation", label: "Animation" },
+  { href: "/search?q=documentary", label: "Documentary" },
+];
+---
+
+<footer class="site-footer">
+  <div class="footer-grid container">
+    <section class="footer-brand" aria-labelledby="footer-brand-title">
+      <h2 id="footer-brand-title">F<span>.</span>MOVIES</h2>
+      <p>Discover movies and TV series through a calm, fast interface powered by TMDB.</p>
+      <p class="disclaimer">F.MOVIES does not host or stream video files. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+    </section>
+    <nav aria-label="Movie links">
+      <h2>Movies</h2>
+      {movieLinks.map((item) => <a href={item.href}>{item.label}</a>)}
+    </nav>
+    <nav aria-label="TV links">
+      <h2>Explore</h2>
+      {tvLinks.map((item) => <a href={item.href}>{item.label}</a>)}
+    </nav>
+    <nav aria-label="Information links">
+      <h2>Information</h2>
+      <a href="https://www.themoviedb.org/" rel="noreferrer">TMDB</a>
+      <a href="mailto:hello@f-movies.app">Contact</a>
+      <a href="/search">Search</a>
+    </nav>
+  </div>
+  <div class="footer-bottom container">
+    <p>© {new Date().getFullYear()} F.MOVIES. Movie metadata provided by TMDB.</p>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    border-top: 1px solid var(--color-border);
+    background: var(--color-footer);
+  }
+
+  .footer-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 2fr) repeat(3, minmax(120px, 1fr));
+    gap: 54px;
+    padding-top: 60px;
+    padding-bottom: 46px;
+  }
+
+  .footer-brand h2 {
+    margin: 0 0 18px;
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .footer-brand h2 span {
+    color: var(--color-accent);
+  }
+
+  .footer-brand p {
+    max-width: 450px;
+    margin: 0 0 12px;
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+
+  .footer-brand .disclaimer {
+    color: var(--color-subtle);
+    font-size: 12px;
+  }
+
+  .footer-grid nav {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .footer-grid nav h2 {
+    margin: 0 0 7px;
+    color: #fff;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+
+  .footer-grid nav a {
+    color: var(--color-muted);
+    font-size: 14px;
+    transition: color var(--transition-fast), transform var(--transition-fast);
+  }
+
+  .footer-grid nav a:hover {
+    color: var(--color-accent);
+    transform: translateX(2px);
+  }
+
+  .footer-bottom {
+    padding-top: 20px;
+    padding-bottom: 20px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .footer-bottom p {
+    margin: 0;
+    color: var(--color-subtle);
+    font-size: 12px;
+  }
+
+  @media (max-width: 880px) {
+    .footer-grid {
+      grid-template-columns: 2fr 1fr 1fr;
+    }
+
+    .footer-brand {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .footer-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 38px 24px;
+      padding-top: 46px;
+    }
+
+    .footer-brand {
+      grid-column: 1 / -1;
+    }
+  }
+</style>

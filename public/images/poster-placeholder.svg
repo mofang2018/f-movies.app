@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" role="img" aria-labelledby="title">
+  <title id="title">Poster unavailable</title>
+  <rect width="400" height="600" fill="#252932"/>
+  <path d="M145 245h110v110H145z" fill="none" stroke="#596171" stroke-width="8"/>
+  <path d="m156 333 34-38 27 25 18-17 20 30" fill="none" stroke="#596171" stroke-width="8"/>
+  <circle cx="225" cy="274" r="12" fill="#596171"/>
+</svg>

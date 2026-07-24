@@ -1,0 +1,26 @@
+---
+import MediaGrid from "../components/MediaGrid.astro";
+import Pagination from "../components/Pagination.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getTmdbToken, TmdbClient } from "../lib/tmdb";
+
+const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
+const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
+Astro.response.headers.set("Cache-Control", "public, s-maxage=900, stale-while-revalidate=86400");
+const client = new TmdbClient(getTmdbToken());
+const catalog = await client.getPopular("movie", page);
+---
+
+<BaseLayout title="Popular Movies - F.MOVIES" description="Browse popular movies and discover your next watch.">
+  <header class="page-heading">
+    <div class="container">
+      <span class="section-kicker">Movie library</span>
+      <h1>Popular movies</h1>
+      <p>Browse audience favorites, current releases and films people are talking about.</p>
+    </div>
+  </header>
+  <div class="page-content container">
+    <MediaGrid items={catalog.results} priorityCount={6} />
+    <Pagination page={catalog.page} totalPages={catalog.totalPages} pathname="/movies" />
+  </div>
+</BaseLayout>

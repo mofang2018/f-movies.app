@@ -1,0 +1,79 @@
+---
+import { ChevronLeft, ChevronRight } from "@lucide/astro";
+
+interface Props {
+  page: number;
+  totalPages: number;
+  pathname: string;
+  query?: Record<string, string>;
+}
+
+const { page, totalPages, pathname, query = {} } = Astro.props;
+const visiblePages = Array.from(new Set([1, page - 1, page, page + 1, totalPages]))
+  .filter((value) => value >= 1 && value <= totalPages)
+  .sort((a, b) => a - b);
+const toHref = (targetPage: number) => {
+  const params = new URLSearchParams(query);
+  if (targetPage > 1) params.set("page", String(targetPage));
+  const suffix = params.toString();
+  return `${pathname}${suffix ? `?${suffix}` : ""}`;
+};
+---
+
+{totalPages > 1 && (
+  <nav class="pagination" aria-label="Pagination">
+    <a class:list={{ disabled: page <= 1 }} href={page > 1 ? toHref(page - 1) : undefined} aria-label="Previous page">
+      <ChevronLeft size={18} />
+    </a>
+    {visiblePages.map((value, index) => (
+      <>
+        {index > 0 && value - visiblePages[index - 1] > 1 && <span aria-hidden="true">...</span>}
+        <a class:list={{ active: value === page }} href={toHref(value)} aria-current={value === page ? "page" : undefined}>{value}</a>
+      </>
+    ))}
+    <a class:list={{ disabled: page >= totalPages }} href={page < totalPages ? toHref(page + 1) : undefined} aria-label="Next page">
+      <ChevronRight size={18} />
+    </a>
+  </nav>
+)}
+
+<style>
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-top: 52px;
+  }
+
+  .pagination a {
+    display: grid;
+    min-width: 40px;
+    height: 40px;
+    place-items: center;
+    padding: 0 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-muted);
+    font-size: 13px;
+    font-weight: 750;
+    transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+  }
+
+  .pagination a:hover,
+  .pagination a.active {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: #15170d;
+  }
+
+  .pagination a.disabled {
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  .pagination span {
+    color: var(--color-subtle);
+  }
+</style>

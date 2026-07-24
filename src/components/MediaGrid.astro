@@ -1,0 +1,36 @@
+---
+import type { MediaItem } from "../types/media";
+import MediaCard from "./MediaCard.astro";
+
+interface Props {
+  items: MediaItem[];
+  priorityCount?: number;
+}
+
+const { items, priorityCount = 0 } = Astro.props;
+---
+
+<div class="media-grid">
+  {items.map((item, index) => <MediaCard item={item} priority={index < priorityCount} />)}
+</div>
+
+<style>
+  .media-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 30px 18px;
+  }
+
+  @media (max-width: 1050px) {
+    .media-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 620px) {
+    .media-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px 12px;
+    }
+  }
+</style>

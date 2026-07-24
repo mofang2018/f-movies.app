@@ -1,0 +1,30 @@
+---
+import MediaGrid from "../../components/MediaGrid.astro";
+import Pagination from "../../components/Pagination.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getTmdbToken, TmdbClient } from "../../lib/tmdb";
+
+const genreId = Number(Astro.params.id);
+if (!Number.isInteger(genreId) || genreId <= 0) return Astro.redirect("/movies");
+const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
+const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
+Astro.response.headers.set("Cache-Control", "public, s-maxage=900, stale-while-revalidate=86400");
+const client = new TmdbClient(getTmdbToken());
+const [catalog, genres] = await Promise.all([client.getByGenre(genreId, page), client.getGenres()]);
+const genre = genres.find((item) => item.id === genreId);
+const genreName = genre?.name ?? "Genre";
+---
+
+<BaseLayout title={`${genreName} Movies - F.MOVIES`} description={`Browse popular ${genreName.toLowerCase()} movies.`}>
+  <header class="page-heading">
+    <div class="container">
+      <span class="section-kicker">Browse by genre</span>
+      <h1>{genreName} movies</h1>
+      <p>Popular and noteworthy titles in {genreName.toLowerCase()}.</p>
+    </div>
+  </header>
+  <div class="page-content container">
+    <MediaGrid items={catalog.results} priorityCount={6} />
+    <Pagination page={catalog.page} totalPages={catalog.totalPages} pathname={`/genre/${genreId}`} />
+  </div>
+</BaseLayout>

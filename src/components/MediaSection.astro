@@ -1,0 +1,101 @@
+---
+import { ArrowRight } from "@lucide/astro";
+import type { MediaItem } from "../types/media";
+import MediaGrid from "./MediaGrid.astro";
+
+interface Props {
+  title: string;
+  items: MediaItem[];
+  href?: string;
+  eyebrow?: string;
+}
+
+const { title, items, href, eyebrow } = Astro.props;
+---
+
+<section class="media-section">
+  <div class="section-head">
+    <div>
+      {eyebrow && <span>{eyebrow}</span>}
+      <h2>{title}</h2>
+    </div>
+    {href && <a href={href}>View all <ArrowRight size={17} /></a>}
+  </div>
+  <MediaGrid items={items} />
+</section>
+
+<style>
+  .media-section {
+    padding: 50px 0 8px;
+  }
+
+  .section-head {
+    display: flex;
+    min-height: 42px;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 23px;
+  }
+
+  .section-head > div {
+    position: relative;
+    padding-left: 14px;
+  }
+
+  .section-head > div::before {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 0;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--color-accent);
+    content: "";
+  }
+
+  .section-head span {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--color-muted);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.15;
+  }
+
+  .section-head a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 2px;
+    color: var(--color-muted);
+    font-size: 13px;
+    font-weight: 700;
+    transition: color var(--transition-fast), gap var(--transition-fast);
+  }
+
+  .section-head a:hover {
+    gap: 9px;
+    color: var(--color-accent);
+  }
+
+  @media (max-width: 620px) {
+    .media-section {
+      padding-top: 38px;
+    }
+
+    .section-head {
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      font-size: 21px;
+    }
+  }
+</style>

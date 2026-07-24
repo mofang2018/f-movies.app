@@ -1,0 +1,426 @@
+---
+import { ChevronDown, Menu, Search, X } from "@lucide/astro";
+import { fallbackGenres } from "../data/fallback";
+import { navigationCountries } from "../data/navigation";
+
+interface Props {
+  currentPath: string;
+}
+
+const { currentPath } = Astro.props;
+const genres = fallbackGenres.filter((genre) => ![10763, 10766, 10767].includes(genre.id));
+const isActive = (href: string) => href === "/" ? currentPath === "/" : currentPath.startsWith(href);
+const isGenreActive = currentPath.startsWith("/genre/");
+const isCountryActive = currentPath.startsWith("/country/");
+---
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="/" aria-label="F.MOVIES home">F<span>.MOVIES</span></a>
+
+    <nav class="desktop-nav" aria-label="Primary navigation">
+      <a class:list={{ active: isActive("/") }} href="/">Home</a>
+
+      <details class:list={["nav-dropdown", { active: isGenreActive }]}>
+        <summary>Genres <ChevronDown size={14} /></summary>
+        <div class="dropdown-panel genre-panel">
+          {genres.map((genre) => <a href={`/genre/${genre.id}`}>{genre.name}</a>)}
+        </div>
+      </details>
+
+      <details class:list={["nav-dropdown", { active: isCountryActive }]}>
+        <summary>Country <ChevronDown size={14} /></summary>
+        <div class="dropdown-panel country-panel">
+          {navigationCountries.map((country) => <a href={`/country/${country.code}`}>{country.name}</a>)}
+        </div>
+      </details>
+
+      <a class:list={{ active: isActive("/movies") }} href="/movies">Movies</a>
+      <a class:list={{ active: isActive("/tv-series") }} href="/tv-series">TV-Series</a>
+      <a class:list={{ active: isActive("/top-imdb") }} href="/top-imdb">Top IMDb</a>
+    </nav>
+
+    <form class="header-search" action="/search" method="get">
+      <label class="screen-reader-only" for="header-query">Search movies and TV series</label>
+      <input id="header-query" type="search" name="q" placeholder="Search" autocomplete="off" />
+      <button type="submit" aria-label="Search"><Search size={17} stroke-width={2.2} /></button>
+    </form>
+
+    <button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
+      <Menu class="menu-open-icon" size={22} />
+      <X class="menu-close-icon" size={22} />
+    </button>
+  </div>
+
+  <div id="mobile-menu" class="mobile-menu" hidden>
+    <form class="mobile-search" action="/search" method="get">
+      <label class="screen-reader-only" for="mobile-query">Search movies and TV series</label>
+      <input id="mobile-query" type="search" name="q" placeholder="Search movies and TV..." />
+      <button type="submit" aria-label="Search"><Search size={18} /></button>
+    </form>
+    <nav aria-label="Mobile navigation">
+      <a class:list={{ active: isActive("/") }} href="/">Home</a>
+      <details open={isGenreActive}>
+        <summary>Genres <ChevronDown size={15} /></summary>
+        <div class="mobile-submenu">
+          {genres.map((genre) => <a href={`/genre/${genre.id}`}>{genre.name}</a>)}
+        </div>
+      </details>
+      <details open={isCountryActive}>
+        <summary>Country <ChevronDown size={15} /></summary>
+        <div class="mobile-submenu">
+          {navigationCountries.map((country) => <a href={`/country/${country.code}`}>{country.name}</a>)}
+        </div>
+      </details>
+      <a class:list={{ active: isActive("/movies") }} href="/movies">Movies</a>
+      <a class:list={{ active: isActive("/tv-series") }} href="/tv-series">TV-Series</a>
+      <a class:list={{ active: isActive("/top-imdb") }} href="/top-imdb">Top IMDb</a>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const toggle = document.querySelector(".menu-toggle");
+  const menu = document.querySelector("#mobile-menu");
+  const desktopDropdowns = Array.from(document.querySelectorAll(".desktop-nav details"));
+
+  toggle?.addEventListener("click", () => {
+    if (!(menu instanceof HTMLElement) || !(toggle instanceof HTMLButtonElement)) return;
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!expanded));
+    toggle.setAttribute("aria-label", expanded ? "Open menu" : "Close menu");
+    menu.hidden = expanded;
+    document.body.classList.toggle("menu-open", !expanded);
+  });
+
+  desktopDropdowns.forEach((dropdown) => dropdown.addEventListener("toggle", () => {
+    if (!(dropdown instanceof HTMLDetailsElement) || !dropdown.open) return;
+    desktopDropdowns.forEach((other) => {
+      if (other instanceof HTMLDetailsElement && other !== dropdown) other.open = false;
+    });
+  }));
+
+  document.addEventListener("click", (event) => {
+    desktopDropdowns.forEach((dropdown) => {
+      if (dropdown instanceof HTMLDetailsElement && !dropdown.contains(event.target as Node)) dropdown.open = false;
+    });
+  });
+</script>
+
+<style>
+  .site-header {
+    --header-accent: #00acc1;
+    --header-height: 66px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    min-height: var(--header-height);
+    background: #1e2028;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.24);
+  }
+
+  .header-inner {
+    display: flex;
+    width: min(100% - 48px, 1440px);
+    height: var(--header-height);
+    align-items: center;
+    gap: 38px;
+    margin-inline: auto;
+  }
+
+  .brand {
+    display: inline-flex;
+    width: 140px;
+    height: 40px;
+    flex: 0 0 140px;
+    align-items: center;
+    justify-content: center;
+    background: var(--header-accent);
+    color: #fff;
+    font-size: 25px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .brand span {
+    margin-left: 3px;
+    font-size: 17px;
+    font-weight: 800;
+  }
+
+  .desktop-nav {
+    display: flex;
+    height: 100%;
+    flex: 1 1 auto;
+    align-items: stretch;
+  }
+
+  .desktop-nav > a,
+  .nav-dropdown > summary {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 5px;
+    padding: 0 15px;
+    color: #bdbdbd;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: color var(--transition-fast), background var(--transition-fast);
+  }
+
+  .desktop-nav > a:hover,
+  .desktop-nav > a.active,
+  .nav-dropdown > summary:hover,
+  .nav-dropdown.active > summary,
+  .nav-dropdown[open] > summary {
+    background: rgba(255, 255, 255, 0.04);
+    color: #fff;
+  }
+
+  .desktop-nav > a.active::after,
+  .nav-dropdown.active > summary::after {
+    position: absolute;
+    right: 15px;
+    bottom: 0;
+    left: 15px;
+    height: 2px;
+    background: var(--header-accent);
+    content: "";
+  }
+
+  .nav-dropdown {
+    position: relative;
+  }
+
+  .nav-dropdown > summary {
+    height: 100%;
+    list-style: none;
+  }
+
+  .nav-dropdown > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .nav-dropdown[open] > summary svg {
+    transform: rotate(180deg);
+  }
+
+  .dropdown-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    display: grid;
+    min-width: 230px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: #272a33;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+  }
+
+  .genre-panel {
+    width: 510px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .country-panel {
+    width: 410px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dropdown-panel a {
+    min-width: 0;
+    padding: 9px 10px;
+    color: #b9bdc6;
+    font-size: 14px;
+  }
+
+  .dropdown-panel a:hover,
+  .dropdown-panel a:focus-visible {
+    background: rgba(0, 172, 193, 0.13);
+    color: #fff;
+  }
+
+  .header-search,
+  .mobile-search {
+    position: relative;
+    display: flex;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .header-search {
+    width: 238px;
+    flex: 0 1 238px;
+  }
+
+  .header-search input,
+  .mobile-search input {
+    width: 100%;
+    min-width: 0;
+    height: 36px;
+    padding: 0 42px 0 13px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #242832;
+    font-size: 14px;
+  }
+
+  .header-search button,
+  .mobile-search button {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: grid;
+    width: 40px;
+    height: 36px;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    color: #4e5664;
+    cursor: pointer;
+  }
+
+  .header-search button:hover,
+  .mobile-search button:hover {
+    color: var(--header-accent);
+  }
+
+  .menu-toggle,
+  .mobile-menu {
+    display: none;
+  }
+
+  @media (max-width: 1080px) {
+    .header-inner {
+      gap: 18px;
+    }
+
+    .desktop-nav > a,
+    .nav-dropdown > summary {
+      padding-inline: 10px;
+      font-size: 14px;
+    }
+
+    .header-search {
+      width: 190px;
+      flex-basis: 190px;
+    }
+  }
+
+  @media (max-width: 899px) {
+    .site-header {
+      --header-height: 62px;
+    }
+
+    .header-inner {
+      width: min(100% - 32px, 1440px);
+      justify-content: space-between;
+    }
+
+    .brand {
+      width: 126px;
+      height: 38px;
+      flex-basis: 126px;
+    }
+
+    .desktop-nav,
+    .header-search {
+      display: none;
+    }
+
+    .menu-toggle {
+      display: grid;
+      width: 40px;
+      height: 40px;
+      place-items: center;
+      border: 0;
+      background: var(--header-accent);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .menu-close-icon {
+      display: none;
+    }
+
+    .menu-toggle[aria-expanded="true"] .menu-open-icon {
+      display: none;
+    }
+
+    .menu-toggle[aria-expanded="true"] .menu-close-icon {
+      display: block;
+    }
+
+    .mobile-menu {
+      position: fixed;
+      inset: var(--header-height) 0 0;
+      display: block;
+      padding: 18px 16px 30px;
+      background: #1e2028;
+      overflow-y: auto;
+    }
+
+    .mobile-menu[hidden] {
+      display: none;
+    }
+
+    .mobile-search {
+      margin-bottom: 18px;
+    }
+
+    .mobile-search input,
+    .mobile-search button {
+      height: 42px;
+    }
+
+    .mobile-menu nav {
+      display: grid;
+      border-top: 1px solid rgba(255, 255, 255, 0.09);
+    }
+
+    .mobile-menu nav > a,
+    .mobile-menu nav > details > summary {
+      display: flex;
+      min-height: 52px;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+      color: #c5c8ce;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      list-style: none;
+    }
+
+    .mobile-menu nav > a.active {
+      color: var(--header-accent);
+    }
+
+    .mobile-menu summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .mobile-menu details[open] > summary svg {
+      transform: rotate(180deg);
+    }
+
+    .mobile-submenu {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      padding: 8px 0 12px;
+      background: rgba(0, 0, 0, 0.12);
+    }
+
+    .mobile-submenu a {
+      min-width: 0;
+      padding: 10px 12px;
+      color: #9da3ae;
+      font-size: 14px;
+    }
+  }
+</style>

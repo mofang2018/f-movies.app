@@ -1,0 +1,276 @@
+---
+import { CalendarDays, Info, Play, Star } from "@lucide/astro";
+import { getImageUrl } from "../lib/images";
+import type { MediaItem } from "../types/media";
+
+interface Props {
+  items: MediaItem[];
+}
+
+const items = Astro.props.items.filter((item) => item.backdropPath).slice(0, 5);
+const slides = items.length > 0 ? items : Astro.props.items.slice(0, 1);
+---
+
+<section class="hero" aria-label="Featured titles" data-hero>
+  {slides.map((item, index) => (
+    <article class="hero-slide" data-slide={index} aria-hidden={index === 0 ? "false" : "true"}>
+      <img
+        class="hero-backdrop"
+        src={getImageUrl(item.backdropPath, "w1280")}
+        alt=""
+        width="1280"
+        height="720"
+        loading={index === 0 ? "eager" : "lazy"}
+        fetchpriority={index === 0 ? "high" : "auto"}
+      />
+      <div class="hero-overlay" aria-hidden="true"></div>
+      <div class="hero-content container">
+        <span class="hero-kicker">Featured {item.mediaType === "movie" ? "Movie" : "Series"}</span>
+        <h1>{item.title}</h1>
+        <div class="hero-meta">
+          <strong>HD</strong>
+          <span><CalendarDays size={15} /> {item.releaseDate.slice(0, 4) || "TBA"}</span>
+          <span>{item.mediaType === "movie" ? "Movie" : "TV Series"}</span>
+          <span class="hero-rating"><Star size={15} fill="currentColor" /> {item.voteAverage.toFixed(1)}</span>
+        </div>
+        <p>{item.overview || "Discover this title, its cast, details and similar recommendations."}</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href={`/${item.mediaType}/${item.id}`}><Play size={18} fill="currentColor" /> Explore title</a>
+          <a class="button button-secondary" href={`/${item.mediaType}/${item.id}`}><Info size={18} /> More info</a>
+        </div>
+      </div>
+    </article>
+  ))}
+  {slides.length > 1 && (
+    <div class="hero-dots container" role="tablist" aria-label="Featured titles">
+      {slides.map((item, index) => (
+        <button
+          type="button"
+          data-dot={index}
+          class:list={{ active: index === 0 }}
+          aria-label={`Show ${item.title}`}
+          aria-selected={index === 0 ? "true" : "false"}
+          role="tab"
+        ></button>
+      ))}
+    </div>
+  )}
+</section>
+
+<script>
+  const hero = document.querySelector("[data-hero]");
+  if (hero instanceof HTMLElement) {
+    const slides = Array.from(hero.querySelectorAll("[data-slide]"));
+    const dots = Array.from(hero.querySelectorAll("[data-dot]"));
+    let activeIndex = 0;
+    let timer: number | undefined;
+
+    const showSlide = (index: number) => {
+      activeIndex = index;
+      slides.forEach((slide, slideIndex) => slide.setAttribute("aria-hidden", String(slideIndex !== index)));
+      dots.forEach((dot, dotIndex) => {
+        dot.classList.toggle("active", dotIndex === index);
+        dot.setAttribute("aria-selected", String(dotIndex === index));
+      });
+    };
+
+    const startRotation = () => {
+      if (slides.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      if (timer !== undefined) window.clearInterval(timer);
+      timer = window.setInterval(() => showSlide((activeIndex + 1) % slides.length), 7000);
+    };
+
+    dots.forEach((dot, index) => dot.addEventListener("click", () => {
+      showSlide(index);
+      startRotation();
+    }));
+    startRotation();
+  }
+</script>
+
+<style>
+  .hero {
+    position: relative;
+    height: 650px;
+    overflow: hidden;
+    background: var(--color-footer);
+  }
+
+  .hero-slide {
+    position: absolute;
+    inset: 0;
+    opacity: 1;
+    transition: opacity 450ms ease;
+  }
+
+  .hero-slide[aria-hidden="true"] {
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .hero-backdrop {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 26%;
+  }
+
+  .hero-overlay {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, rgba(15, 17, 21, 0.98) 0%, rgba(15, 17, 21, 0.83) 32%, rgba(15, 17, 21, 0.22) 70%),
+      linear-gradient(0deg, var(--color-bg) 0%, rgba(30, 33, 41, 0) 37%);
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    height: 100%;
+    max-width: var(--content-width);
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 30px;
+  }
+
+  .hero-content > * {
+    max-width: 660px;
+  }
+
+  .hero-kicker {
+    margin-bottom: 12px;
+    color: var(--color-accent);
+    font-size: 12px;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(46px, 5vw, 68px);
+    font-weight: 850;
+    line-height: 1.03;
+    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  }
+
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 17px;
+    margin-top: 20px;
+    color: #d8dce2;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .hero-meta > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .hero-meta strong {
+    padding: 4px 7px;
+    border-radius: var(--radius-sm);
+    background: var(--color-accent);
+    color: #15170d;
+    font-size: 11px;
+  }
+
+  .hero-meta .hero-rating {
+    color: var(--color-rating);
+  }
+
+  .hero-content p {
+    display: -webkit-box;
+    margin: 19px 0 0;
+    overflow: hidden;
+    color: #d0d4db;
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 11px;
+    margin-top: 27px;
+  }
+
+  .hero-dots {
+    position: absolute;
+    z-index: 4;
+    right: 0;
+    bottom: 42px;
+    left: 0;
+    display: flex;
+    gap: 8px;
+  }
+
+  .hero-dots button {
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.38);
+    cursor: pointer;
+    transition: width 220ms ease, background 220ms ease;
+  }
+
+  .hero-dots button.active {
+    width: 28px;
+    background: var(--color-accent);
+  }
+
+  @media (max-width: 767px) {
+    .hero {
+      height: 560px;
+    }
+
+    .hero-backdrop {
+      object-position: 64% center;
+    }
+
+    .hero-overlay {
+      background:
+        linear-gradient(90deg, rgba(15, 17, 21, 0.9), rgba(15, 17, 21, 0.38)),
+        linear-gradient(0deg, var(--color-bg) 0%, rgba(20, 22, 27, 0.25) 62%, rgba(20, 22, 27, 0.45));
+    }
+
+    .hero-content {
+      justify-content: flex-end;
+      padding-bottom: 76px;
+    }
+
+    h1 {
+      font-size: clamp(36px, 10vw, 46px);
+    }
+
+    .hero-content p {
+      font-size: 14px;
+      line-height: 1.58;
+      -webkit-line-clamp: 2;
+    }
+
+    .hero-actions {
+      margin-top: 21px;
+    }
+
+    .hero-actions .button {
+      min-height: 42px;
+      padding-inline: 14px;
+      font-size: 13px;
+    }
+
+    .hero-dots {
+      bottom: 35px;
+    }
+  }
+</style>

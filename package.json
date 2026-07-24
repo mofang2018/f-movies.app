@@ -1,0 +1,35 @@
+{
+  "name": "f-movies-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "F_MOVIES_VITE_CACHE_DIR=node_modules/.vite-dev astro dev",
+    "build": "F_MOVIES_VITE_CACHE_DIR=node_modules/.vite-build astro check && F_MOVIES_VITE_CACHE_DIR=node_modules/.vite-build astro build",
+    "data:refresh": "node scripts/download-tmdb-snapshot.mjs",
+    "preview": "F_MOVIES_VITE_CACHE_DIR=node_modules/.vite-dev astro dev",
+    "check": "F_MOVIES_VITE_CACHE_DIR=node_modules/.vite-check astro check",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:images": "wrangler deploy --config wrangler.images.jsonc",
+    "typecheck": "F_MOVIES_VITE_CACHE_DIR=node_modules/.vite-check astro check"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.1.4",
+    "@lucide/astro": "^1.26.0",
+    "astro": "^7.1.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.6",
+    "cheerio": "^1.2.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.54.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "allowScripts": {
+    "workerd@1.20260722.1": true,
+    "esbuild@0.28.1": true,
+    "fsevents@2.3.3": true
+  }
+}

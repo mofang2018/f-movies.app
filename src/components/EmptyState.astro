@@ -1,0 +1,73 @@
+---
+import { Search } from "@lucide/astro";
+
+interface Props {
+  query?: string;
+  title?: string;
+  description?: string;
+}
+
+const { query = "", title = "No titles found", description } = Astro.props;
+const message = description
+  ?? (query ? `We could not find a movie or TV series matching “${query}”.` : "Try a different title or browse the popular catalog.");
+---
+
+<section class="empty-state">
+  <Search size={42} stroke-width={1.5} />
+  <h2>{title}</h2>
+  <p>{message}</p>
+  <form action="/search" method="get">
+    <label class="screen-reader-only" for="empty-query">Search movies and TV series</label>
+    <input id="empty-query" type="search" name="q" value={query} placeholder="Search another title..." />
+    <button class="button button-primary" type="submit">Search</button>
+  </form>
+</section>
+
+<style>
+  .empty-state {
+    display: flex;
+    min-height: 360px;
+    align-items: center;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .empty-state > svg {
+    color: var(--color-accent);
+  }
+
+  h2 {
+    margin: 18px 0 5px;
+    font-size: 25px;
+  }
+
+  p {
+    max-width: 520px;
+    margin: 0;
+    color: var(--color-muted);
+  }
+
+  form {
+    display: flex;
+    width: min(100%, 520px);
+    gap: 9px;
+    margin-top: 25px;
+  }
+
+  input {
+    min-width: 0;
+    flex: 1;
+    height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    outline: 0;
+    background: var(--color-surface);
+    color: #fff;
+  }
+
+  input:focus {
+    border-color: var(--color-accent);
+  }
+</style>

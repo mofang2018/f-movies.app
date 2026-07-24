@@ -1,0 +1,12 @@
+---
+import DetailsPage from "../../components/DetailsPage.astro";
+import { getTmdbToken, TmdbClient } from "../../lib/tmdb";
+
+const id = Number(Astro.params.id);
+if (!Number.isInteger(id) || id <= 0) return Astro.redirect("/tv-series");
+Astro.response.headers.set("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
+const client = new TmdbClient(getTmdbToken());
+const details = await client.getDetails("tv", id);
+---
+
+<DetailsPage details={details} />

@@ -1,0 +1,115 @@
+---
+import { Link, Mail, Send, Share2 } from "@lucide/astro";
+---
+
+<section class="share-strip" aria-label="Share F.MOVIES">
+  <div class="share-inner container">
+    <div class="share-copy">
+      <strong>Find your next story.</strong>
+      <span>Fresh movie and TV discoveries, no sign-up required.</span>
+    </div>
+    <div class="share-actions">
+      <button type="button" data-share="native"><Share2 size={16} /> Share</button>
+      <a href="mailto:?subject=Discover%20F.MOVIES&body=https%3A%2F%2Ff-movies.app"><Mail size={16} /> Email</a>
+      <a href="https://t.me/share/url?url=https%3A%2F%2Ff-movies.app" rel="noreferrer"><Send size={16} /> Telegram</a>
+      <button type="button" data-share="copy"><Link size={16} /> Copy link</button>
+    </div>
+  </div>
+</section>
+
+<script>
+  const shareButton = document.querySelector("[data-share='native']");
+  const copyButton = document.querySelector("[data-share='copy']");
+  shareButton?.addEventListener("click", async () => {
+    if (navigator.share) await navigator.share({ title: "F.MOVIES", url: window.location.href });
+    else await navigator.clipboard.writeText(window.location.href);
+  });
+  copyButton?.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(window.location.href);
+    if (copyButton instanceof HTMLButtonElement) {
+      const original = copyButton.innerHTML;
+      copyButton.textContent = "Copied";
+      window.setTimeout(() => { copyButton.innerHTML = original; }, 1600);
+    }
+  });
+</script>
+
+<style>
+  .share-strip {
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-footer);
+  }
+
+  .share-inner {
+    display: flex;
+    min-height: 92px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 30px;
+  }
+
+  .share-copy {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .share-copy strong {
+    font-size: 17px;
+  }
+
+  .share-copy span {
+    margin-top: 2px;
+    color: var(--color-muted);
+    font-size: 13px;
+  }
+
+  .share-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .share-actions a,
+  .share-actions button {
+    display: inline-flex;
+    height: 38px;
+    align-items: center;
+    gap: 7px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-muted);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: color var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .share-actions a:hover,
+  .share-actions button:hover {
+    border-color: rgba(183, 227, 43, 0.45);
+    color: var(--color-accent);
+  }
+
+  @media (max-width: 760px) {
+    .share-inner {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 17px;
+      padding-top: 22px;
+      padding-bottom: 22px;
+    }
+
+    .share-actions {
+      width: 100%;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .share-actions a,
+    .share-actions button {
+      flex: 0 0 auto;
+    }
+  }
+</style>
