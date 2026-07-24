@@ -17,7 +17,7 @@ const isCountryActive = currentPath.startsWith("/country/");
 
 <header class="site-header">
   <div class="header-inner">
-    <a class="brand" href="/" aria-label="FMOVIES landing page">FMOVIES</a>
+    <a class="brand" href="/" aria-label="FMOVIES landing page"><img src="/logo.svg" width="170" height="48" alt="FMOVIES" /></a>
 
     <nav class="desktop-nav" aria-label="Primary navigation">
       <a class:list={{ active: isActive("/home") }} href="/home" aria-current={isActive("/home") ? "page" : undefined}>Home</a>
@@ -131,20 +131,17 @@ const isCountryActive = currentPath.startsWith("/country/");
 
   .brand {
     display: inline-flex;
-    width: 140px;
+    width: 142px;
     height: 40px;
-    flex: 0 0 140px;
+    flex: 0 0 142px;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
-    background: linear-gradient(135deg, #3f8ead, #286d89);
-    color: #fff;
-    font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
-    font-size: 28px;
-    font-weight: 900;
-    letter-spacing: -1.2px;
-    line-height: 1;
-    text-transform: uppercase;
+  }
+
+  .brand img {
+    display: block;
+    width: 100%;
+    height: 100%;
   }
 
   .desktop-nav {
