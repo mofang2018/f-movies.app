@@ -2,6 +2,7 @@
 import MediaGrid from "../../components/MediaGrid.astro";
 import Pagination from "../../components/Pagination.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
 import { genrePath, genreSlug } from "../../lib/genre-url";
 import { canonicalPath, catalogCacheControl, paginationLinks } from "../../lib/seo";
 import { getTmdbToken, TmdbClient } from "../../lib/tmdb";
@@ -19,14 +20,30 @@ const basePath = genrePath(genre);
 if (Astro.url.searchParams.get("page") === "1") return Astro.redirect(basePath, 301);
 const catalog = await client.getByGenre(genre.id, page);
 if (catalog.totalPages > 0 && page > catalog.totalPages) return Astro.rewrite("/404");
+const pagePath = canonicalPath(basePath, catalog.page);
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    { "@type": "CollectionPage", name: `${genre.name} Movies`, url: new URL(pagePath, Astro.site).href },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: new URL("/home", Astro.site).href },
+        { "@type": "ListItem", position: 2, name: `${genre.name} Movies`, item: new URL(pagePath, Astro.site).href },
+      ],
+    },
+  ],
+};
 ---
 
 <BaseLayout
   title={`${genre.name} Movies — Ratings, Cast & More | F.MOVIES`}
-  description={`Browse ${genre.name.toLowerCase()} movies with community ratings, story details, cast information and recommendations from the F.MOVIES catalogue.`}
-  canonicalPath={canonicalPath(basePath, catalog.page)}
+  description={`Discover ${genre.name.toLowerCase()} movies with story summaries, community ratings, cast details and recommendations. Browse the F.MOVIES catalogue to find your next film.`}
+  canonicalPath={pagePath}
   paginationLinks={paginationLinks(basePath, catalog.page, catalog.totalPages)}
+  structuredData={structuredData}
 >
+  <Breadcrumbs items={[{ href: "/home", label: "Home" }, { label: `${genre.name} Movies` }]} />
   <header class="page-heading">
     <div class="container">
       <span class="section-kicker">Browse by genre</span>

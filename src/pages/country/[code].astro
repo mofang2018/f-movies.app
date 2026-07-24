@@ -4,6 +4,7 @@ import MediaGrid from "../../components/MediaGrid.astro";
 import Pagination from "../../components/Pagination.astro";
 import { navigationCountries } from "../../data/navigation";
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
 import { CatalogClient } from "../../lib/catalog";
 import { canonicalPath, catalogCacheControl, paginationLinks } from "../../lib/seo";
 
@@ -17,14 +18,31 @@ Astro.response.headers.set("Cache-Control", catalogCacheControl);
 const catalog = await new CatalogClient().getByCountry(country.code, page)
   ?? { page, totalPages: 0, totalResults: 0, results: [] };
 if (catalog.totalPages > 0 && page > catalog.totalPages) return Astro.rewrite("/404");
+const pagePath = canonicalPath(`/country/${country.slug}`, catalog.page);
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    { "@type": "CollectionPage", name: `${country.name} Movies`, url: new URL(pagePath, Astro.site).href },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: new URL("/home", Astro.site).href },
+        { "@type": "ListItem", position: 2, name: `${country.name} Movies`, item: new URL(pagePath, Astro.site).href },
+      ],
+    },
+  ],
+};
 ---
 
 <BaseLayout
   title={`${country.name} Movies — Ratings, Cast & More | F.MOVIES`}
-  description={`Browse movies from ${country.name} in the downloaded F.MOVIES catalogue, with story details, community ratings, cast information and recommendations.`}
-  canonicalPath={canonicalPath(`/country/${country.slug}`, catalog.page)}
+  description={`Discover movies from ${country.name} with story summaries, community ratings, cast details and recommendations. Browse the F.MOVIES catalogue to find your next film.`}
+  robots={catalog.totalResults ? "index,follow" : "noindex,follow"}
+  canonicalPath={pagePath}
   paginationLinks={paginationLinks(`/country/${country.slug}`, catalog.page, catalog.totalPages)}
+  structuredData={structuredData}
 >
+  <Breadcrumbs items={[{ href: "/home", label: "Home" }, { label: `${country.name} Movies` }]} />
   <header class="page-heading">
     <div class="container">
       <span class="section-kicker">Browse by country</span>

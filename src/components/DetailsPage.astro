@@ -5,6 +5,7 @@ import { mediaPath } from "../lib/media-url";
 import { genrePath } from "../lib/genre-url";
 import type { MediaDetails } from "../types/media";
 import BaseLayout from "../layouts/BaseLayout.astro";
+import Breadcrumbs from "./Breadcrumbs.astro";
 import MediaSection from "./MediaSection.astro";
 
 interface Props {
@@ -24,6 +25,13 @@ const mediaLabel = details.mediaType === "movie" ? "Movie" : "TV Series";
 const trailerEmbedUrl = details.trailerKey
   ? `https://www.youtube-nocookie.com/embed/${details.trailerKey}?autoplay=1&rel=0&modestbranding=1`
   : null;
+const parentPath = details.mediaType === "movie" ? "/movies" : "/tv-series";
+const parentLabel = details.mediaType === "movie" ? "Movies" : "TV Series";
+const breadcrumbs = [
+  { href: "/home", label: "Home" },
+  { href: parentPath, label: parentLabel },
+  { label: details.title },
+];
 const structuredData = {
   "@context": "https://schema.org",
   "@graph": [
@@ -41,7 +49,7 @@ const structuredData = {
       "@type": "BreadcrumbList",
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "Home", item: new URL("/home", Astro.site).href },
-        { "@type": "ListItem", position: 2, name: details.mediaType === "movie" ? "Movies" : "TV Series", item: new URL(details.mediaType === "movie" ? "/movies" : "/tv-series", Astro.site).href },
+        { "@type": "ListItem", position: 2, name: parentLabel, item: new URL(parentPath, Astro.site).href },
         { "@type": "ListItem", position: 3, name: details.title, item: new URL(canonicalPath, Astro.site).href },
       ],
     },
@@ -55,9 +63,11 @@ const structuredData = {
   image={shareImage}
   imageWidth={1280}
   imageHeight={720}
+  openGraphType={details.mediaType === "movie" ? "video.movie" : "video.tv_show"}
   structuredData={structuredData}
 >
   <article class="details">
+    <Breadcrumbs items={breadcrumbs} />
     <section class="details-hero">
       <img class="details-backdrop" src={getImageUrl(details.backdropPath, "w1280")} alt="" width="1280" height="720" />
       <div class="details-overlay" aria-hidden="true"></div>

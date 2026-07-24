@@ -9,6 +9,7 @@ interface Props {
   image?: string;
   imageWidth?: number;
   imageHeight?: number;
+  openGraphType?: "website" | "video.movie" | "video.tv_show";
   robots?: string;
   canonicalPath?: string;
   paginationLinks?: Array<{ rel: "prev" | "next"; href: string }>;
@@ -21,13 +22,14 @@ const {
   image: suppliedImage,
   imageWidth = 1200,
   imageHeight = 630,
+  openGraphType = "website",
   robots = "index,follow",
   canonicalPath = Astro.url.pathname,
   paginationLinks = [],
   structuredData,
 } = Astro.props;
 const canonical = new URL(canonicalPath, Astro.site);
-const image = suppliedImage ?? new URL("/images/social-card.svg", Astro.site).href;
+const image = suppliedImage ?? new URL("/images/social-card.png", Astro.site).href;
 const jsonLdData = structuredData ?? {
   "@context": "https://schema.org",
   "@type": "WebPage",
@@ -36,6 +38,10 @@ const jsonLdData = structuredData ?? {
   url: canonical.href,
 };
 const jsonLd = JSON.stringify(jsonLdData).replace(/</g, "\\u003c");
+Astro.response.headers.set(
+  "Content-Security-Policy",
+  "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; img-src 'self' data: https://images.f-movies.app https://f-movies-images.ericfang2013.workers.dev https://image.tmdb.org; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-src https://www.youtube-nocookie.com",
+);
 ---
 
 <!doctype html>
@@ -52,7 +58,7 @@ const jsonLd = JSON.stringify(jsonLdData).replace(/</g, "\\u003c");
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
     <link rel="manifest" href="/site.webmanifest" />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={openGraphType} />
     <meta property="og:site_name" content="F.MOVIES" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:title" content={title} />
