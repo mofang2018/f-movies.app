@@ -23,10 +23,9 @@ export const GET: APIRoute = async ({ params }) => {
   }
   const database = (env as RuntimeEnv).CATALOG_DB;
   if (!database) return new Response("Catalog unavailable", { status: 503 });
-  const lower = shard * sitemapShardSize;
-  const upper = lower + sitemapShardSize;
+  const offset = shard * sitemapShardSize;
   const rows = await database.prepare(`SELECT media_type, tmdb_id, title, updated_at FROM media
-    WHERE media_type = ? AND tmdb_id >= ? AND tmdb_id < ? ORDER BY tmdb_id`).bind(mediaType, lower, upper).all<MediaRow>();
+    WHERE media_type = ? ORDER BY tmdb_id LIMIT ? OFFSET ?`).bind(mediaType, sitemapShardSize, offset).all<MediaRow>();
   if (!rows.results.length) return new Response(null, { status: 404 });
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${rows.results
     .map((row) => `  <url><loc>${xml(absoluteUrl(sitemapMediaPath(row.media_type, row.tmdb_id, row.title)))}</loc><lastmod>${xml(row.updated_at)}</lastmod></url>`)

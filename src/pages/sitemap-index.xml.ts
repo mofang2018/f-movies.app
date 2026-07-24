@@ -17,9 +17,17 @@ const xmlHeaders = {
 export const GET: APIRoute = async () => {
   const database = (env as RuntimeEnv).CATALOG_DB;
   if (!database) return new Response("Catalog unavailable", { status: 503 });
-  const shardsResult = await database.prepare(`SELECT media_type, CAST(tmdb_id / ? AS INTEGER) AS shard,
-    MAX(updated_at) AS lastmod
-    FROM media GROUP BY media_type, shard ORDER BY media_type, shard`).bind(sitemapShardSize).all<ShardRow>();
+  // Group by stable position, not TMDB id ranges. TMDB ids are sparse, and
+  // range-based grouping created hundreds of nearly empty sitemap files.
+  const shardsResult = await database.prepare(`WITH numbered AS (
+      SELECT media_type, updated_at,
+        CAST((ROW_NUMBER() OVER (PARTITION BY media_type ORDER BY tmdb_id) - 1) / ? AS INTEGER) AS shard
+      FROM media
+    )
+    SELECT media_type, shard, MAX(updated_at) AS lastmod
+    FROM numbered
+    GROUP BY media_type, shard
+    ORDER BY media_type, shard`).bind(sitemapShardSize).all<ShardRow>();
   const shards = shardsResult.results;
   const entries: Array<{ loc: string; lastmod?: string }> = [
     { loc: absoluteUrl("/sitemap-static.xml") },
