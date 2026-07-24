@@ -14,10 +14,16 @@ interface ImageEnv {
 
 function cachedImageKeys(imagePath: string, requestedSize: string): string[] {
   const filename = imagePath.replace(/^\//, "");
+  // Site markup consistently uses w500/w342 for posters, w1280 for
+  // backdrops and w185 for profiles. Pick the corresponding bucket directly
+  // instead of performing up to three R2 reads on a CDN miss.
+  const primaryKey = requestedSize === "w1280"
+    ? `tmdb/backdrop/w1280/${filename}`
+    : requestedSize === "w185"
+      ? `tmdb/profile/w185/${filename}`
+      : `tmdb/poster/w500/${filename}`;
   return [
-    `tmdb/poster/w500/${filename}`,
-    `tmdb/backdrop/w1280/${filename}`,
-    `tmdb/profile/w185/${filename}`,
+    primaryKey,
     ...(requestedSize === "original" ? [
       `tmdb/poster/original/${filename}`,
       `tmdb/backdrop/original/${filename}`,
