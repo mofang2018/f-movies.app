@@ -1,23 +1,28 @@
-const tmdbImageOrigin = "https://image.tmdb.org/t/p/original";
-const widths: Record<string, number | undefined> = {
-  w185: 185,
-  w342: 342,
-  w500: 500,
-  w780: 780,
-  w1280: 1280,
-  original: undefined,
+const tmdbImageOrigin = "https://image.tmdb.org/t/p";
+const allowedSizes: Record<string, true> = {
+  w185: true,
+  w342: true,
+  w500: true,
+  w780: true,
+  w1280: true,
+  original: true,
 };
 
 interface ImageEnv {
   TMDB_IMAGES: R2Bucket;
 }
 
-function cachedImageKeys(imagePath: string): string[] {
+function cachedImageKeys(imagePath: string, requestedSize: string): string[] {
   const filename = imagePath.replace(/^\//, "");
   return [
-    `tmdb/poster/original/${filename}`,
-    `tmdb/backdrop/original/${filename}`,
-    `tmdb/profile/original/${filename}`,
+    `tmdb/poster/w500/${filename}`,
+    `tmdb/backdrop/w1280/${filename}`,
+    `tmdb/profile/w185/${filename}`,
+    ...(requestedSize === "original" ? [
+      `tmdb/poster/original/${filename}`,
+      `tmdb/backdrop/original/${filename}`,
+      `tmdb/profile/original/${filename}`,
+    ] : []),
   ];
 }
 
@@ -29,14 +34,13 @@ export default {
 
     const url = new URL(request.url);
     const [, requestedSize, ...pathParts] = url.pathname.split("/");
-    const width = widths[requestedSize];
     const imagePath = pathParts.join("/");
 
-    if (!(requestedSize in widths) || !/^[a-zA-Z0-9/_-]+\.(avif|jpg|jpeg|png|webp)$/.test(imagePath)) {
+    if (!(requestedSize in allowedSizes) || !/^[a-zA-Z0-9/_-]+\.(avif|jpg|jpeg|png|webp)$/.test(imagePath)) {
       return new Response("Invalid image path", { status: 400 });
     }
 
-    for (const key of cachedImageKeys(imagePath)) {
+    for (const key of cachedImageKeys(imagePath, requestedSize)) {
       const object = await env.TMDB_IMAGES.get(key);
       if (!object) continue;
       const headers = new Headers();
@@ -47,29 +51,17 @@ export default {
       return new Response(request.method === "HEAD" ? null : object.body, { headers });
     }
 
-    const accept = request.headers.get("Accept") ?? "image/webp,image/*";
-    const format = accept.includes("image/avif") ? "avif" : accept.includes("image/webp") ? "webp" : "jpeg";
     const requestInit: RequestInit<RequestInitCfProperties> = {
-      headers: {
-        Accept: accept,
-      },
       cf: {
         cacheEverything: true,
         cacheTtl: 2_592_000,
-        image: {
-          fit: "scale-down",
-          format,
-          quality: 82,
-          ...(width ? { width } : {}),
-        },
       },
     };
-    const upstream = await fetch(`${tmdbImageOrigin}/${imagePath}`, requestInit);
+    const upstream = await fetch(`${tmdbImageOrigin}/${requestedSize}/${imagePath}`, requestInit);
     if (!upstream.ok) return new Response("Image unavailable", { status: upstream.status });
 
     const headers = new Headers(upstream.headers);
     headers.set("Cache-Control", "public, max-age=2592000, stale-while-revalidate=604800");
-    headers.set("Vary", "Accept");
     headers.set("X-Image-Source", "tmdb");
     headers.delete("Set-Cookie");
 

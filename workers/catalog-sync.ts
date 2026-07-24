@@ -81,8 +81,10 @@ function isValidImagePath(path: string): boolean {
   return /^\/[a-zA-Z0-9_-]+\.(?:avif|jpe?g|png|webp)$/.test(path);
 }
 
+const cachedImageSizes = { poster: "w500", backdrop: "w1280", profile: "w185" } as const;
+
 function imageKey(message: ImageMessage): string {
-  return `tmdb/${message.imageType}/original/${message.path.slice(1)}`;
+  return `tmdb/${message.imageType}/${cachedImageSizes[message.imageType]}/${message.path.slice(1)}`;
 }
 
 function retryDelay(attempt: number, retryAfter?: string | null): number {
@@ -162,7 +164,7 @@ async function enqueueSeeds(env: SyncEnv, limit: number): Promise<number> {
  * One-time/backfillable enrichment for records that predate media_countries.
  * The job is opt-in through sync_jobs so normal cron runs stay inexpensive.
  */
-async function enqueueCountryBackfill(env: SyncEnv, limit = 25): Promise<number> {
+async function runCountryBackfill(env: SyncEnv, limit = 50): Promise<number> {
   const job = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
     .bind("country-backfill-cursor").first<{ state: string }>();
   if (!job || job.state === "done") return 0;
@@ -170,27 +172,41 @@ async function enqueueCountryBackfill(env: SyncEnv, limit = 25): Promise<number>
   const cursor = Math.max(0, Number(job.state) || 0);
   const rows = await env.CATALOG_DB.prepare(`SELECT rowid, media_type, tmdb_id FROM media
     WHERE rowid > ? ORDER BY rowid LIMIT ?`).bind(cursor, limit).all<{ rowid: number; media_type: MediaType; tmdb_id: number }>();
-  const messages: MediaMessage[] = rows.results.map((row) => ({
-    kind: "media",
-    mediaType: row.media_type,
-    tmdbId: row.tmdb_id,
-  }));
-  for (let index = 0; index < messages.length; index += 100) {
-    await env.MEDIA_SYNC_QUEUE.sendBatch(messages.slice(index, index + 100).map((body) => ({ body })));
+  // Country enrichment is a one-off, sequential job. It bypasses Queues and
+  // reads only the country fields needed for the D1 index.
+  for (const row of rows.results) {
+    await processCountries(env, row.media_type, row.tmdb_id);
   }
   const nextState = rows.results.length < limit ? "done" : String(rows.results.at(-1)?.rowid ?? cursor);
   await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = ?, updated_at = ? WHERE job_key = ?")
     .bind(nextState, now(), "country-backfill-cursor").run();
-  return messages.length;
+  return rows.results.length;
+}
+
+function countryCodesFor(detail: TmdbDetail): string[] {
+  return [...new Set([
+    ...(detail.production_countries ?? []).map((country) => country.iso_3166_1),
+    ...(detail.origin_country ?? []),
+  ].filter((code): code is string => /^[A-Z]{2}$/.test(code ?? "")))];
+}
+
+async function processCountries(env: SyncEnv, mediaType: MediaType, tmdbId: number): Promise<void> {
+  const detail = await tmdbFetch<TmdbDetail>(env, `/${mediaType}/${tmdbId}`);
+  const statements: D1PreparedStatement[] = [
+    env.CATALOG_DB.prepare("DELETE FROM media_countries WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, tmdbId),
+  ];
+  for (const countryCode of countryCodesFor(detail)) {
+    statements.push(env.CATALOG_DB.prepare(
+      "INSERT INTO media_countries (media_type, tmdb_id, country_code) VALUES (?, ?, ?)",
+    ).bind(mediaType, tmdbId, countryCode));
+  }
+  await env.CATALOG_DB.batch(statements);
 }
 
 async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetail): Promise<void> {
   const updatedAt = now();
   const genres = detail.genres ?? [];
-  const countryCodes = [...new Set([
-    ...(detail.production_countries ?? []).map((country) => country.iso_3166_1),
-    ...(detail.origin_country ?? []),
-  ].filter((code): code is string => /^[A-Z]{2}$/.test(code ?? "")))];
+  const countryCodes = countryCodesFor(detail);
   const cast = (detail.credits?.cast ?? []).slice(0, 10);
   const statements: D1PreparedStatement[] = [
     env.CATALOG_DB.prepare(`INSERT INTO media (
@@ -253,7 +269,7 @@ async function processImage(env: SyncEnv, message: ImageMessage): Promise<void> 
   if (!isValidImagePath(message.path)) throw new Error("Invalid TMDB image path");
   const key = imageKey(message);
   if (await env.TMDB_IMAGES.head(key)) return;
-  const response = await fetch(`https://image.tmdb.org/t/p/original${message.path}`, { signal: AbortSignal.timeout(20_000) });
+  const response = await fetch(`https://image.tmdb.org/t/p/${cachedImageSizes[message.imageType]}${message.path}`, { signal: AbortSignal.timeout(20_000) });
   if (!response.ok) {
     const error = new Error(`TMDB image ${response.status}`) as Error & { status?: number; retryAfter?: string | null };
     error.status = response.status;
@@ -300,10 +316,11 @@ export default {
     const run = await env.CATALOG_DB.prepare("INSERT INTO sync_runs (trigger, started_at, status) VALUES (?, ?, ?)")
       .bind("cron", startedAt, "running").run();
     try {
-      const [countryBackfillCount, seededCount] = await Promise.all([
-        enqueueCountryBackfill(env),
-        enqueueSeeds(env, 25),
-      ]);
+      const countryBackfillCount = await runCountryBackfill(env);
+      // Complete the one-off local country index before spending Queue
+      // operations on ongoing catalog discovery.
+      const isDiscoverySlot = new Date().getUTCMinutes() === 5;
+      const seededCount = countryBackfillCount > 0 || !isDiscoverySlot ? 0 : await enqueueSeeds(env, 25);
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, seeded_count = ?, completed_at = ? WHERE id = ?")
         .bind("completed", countryBackfillCount + seededCount, now(), run.meta.last_row_id).run();
     } catch (error) {
