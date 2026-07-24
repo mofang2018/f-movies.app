@@ -1,0 +1,283 @@
+export interface SyncEnv {
+  CATALOG_DB: D1Database;
+  TMDB_IMAGES: R2Bucket;
+  MEDIA_SYNC_QUEUE: Queue<SyncMessage>;
+  IMAGE_INGEST_QUEUE: Queue<ImageMessage>;
+  TMDB_RATE_LIMITER: DurableObjectNamespace;
+  TMDB_READ_ACCESS_TOKEN: string;
+  SYNC_ADMIN_TOKEN?: string;
+}
+
+type MediaType = "movie" | "tv";
+
+interface MediaMessage {
+  kind: "media";
+  mediaType: MediaType;
+  tmdbId: number;
+}
+
+interface ImageMessage {
+  kind: "image";
+  imageType: "poster" | "backdrop" | "profile";
+  path: string;
+}
+
+type SyncMessage = MediaMessage | ImageMessage;
+
+interface TmdbListResponse {
+  results: Array<{ id: number; media_type?: string }>;
+}
+
+interface TmdbGenre {
+  id: number;
+  name: string;
+}
+
+interface TmdbDetail {
+  id: number;
+  title?: string;
+  name?: string;
+  original_title?: string;
+  original_name?: string;
+  overview?: string;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average?: number;
+  vote_count?: number;
+  popularity?: number;
+  poster_path?: string | null;
+  backdrop_path?: string | null;
+  runtime?: number | null;
+  number_of_seasons?: number | null;
+  status?: string;
+  genres?: TmdbGenre[];
+  credits?: {
+    cast?: Array<{
+      id: number;
+      name: string;
+      character?: string;
+      profile_path?: string | null;
+      order?: number;
+    }>;
+  };
+}
+
+const apiBase = "https://api.themoviedb.org/3";
+const maxImageBytes = { poster: 8_000_000, profile: 8_000_000, backdrop: 16_000_000 } as const;
+
+function now(): string {
+  return new Date().toISOString();
+}
+
+function isValidImagePath(path: string): boolean {
+  return /^\/[a-zA-Z0-9_-]+\.(?:avif|jpe?g|png|webp)$/.test(path);
+}
+
+function imageKey(message: ImageMessage): string {
+  return `tmdb/${message.imageType}/original/${message.path.slice(1)}`;
+}
+
+function retryDelay(attempt: number, retryAfter?: string | null): number {
+  const retrySeconds = Number(retryAfter);
+  if (Number.isFinite(retrySeconds) && retrySeconds > 0) return Math.min(900, Math.ceil(retrySeconds));
+  return Math.min(900, 60 * (2 ** Math.min(attempt, 4)) + Math.floor(Math.random() * 10));
+}
+
+async function takeRateLimitToken(env: SyncEnv): Promise<void> {
+  const limiter = env.TMDB_RATE_LIMITER.get(env.TMDB_RATE_LIMITER.idFromName("tmdb-api-global"));
+  const response = await limiter.fetch("https://rate-limiter.internal/take");
+  if (!response.ok) throw new Error("TMDB rate limiter unavailable");
+  const { waitMs } = await response.json<{ waitMs: number }>();
+  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+}
+
+async function tmdbFetch<T>(env: SyncEnv, path: string, params: Record<string, string | number> = {}): Promise<T> {
+  if (!env.TMDB_READ_ACCESS_TOKEN) throw new Error("TMDB_READ_ACCESS_TOKEN is not configured");
+  await takeRateLimitToken(env);
+  const url = new URL(`${apiBase}${path}`);
+  url.searchParams.set("language", "en-US");
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, String(value));
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${env.TMDB_READ_ACCESS_TOKEN}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    const error = new Error(`TMDB ${response.status} ${path}`) as Error & { status?: number; retryAfter?: string | null };
+    error.status = response.status;
+    error.retryAfter = response.headers.get("Retry-After");
+    throw error;
+  }
+  return response.json() as Promise<T>;
+}
+
+async function enqueueSeeds(env: SyncEnv, limit: number): Promise<number> {
+  const sources: Array<{ path: string; mediaType: MediaType }> = [
+    { path: "/trending/all/day", mediaType: "movie" },
+    { path: "/trending/all/week", mediaType: "movie" },
+    { path: "/movie/popular", mediaType: "movie" },
+    { path: "/movie/now_playing", mediaType: "movie" },
+    { path: "/movie/top_rated", mediaType: "movie" },
+    { path: "/tv/popular", mediaType: "tv" },
+    { path: "/tv/on_the_air", mediaType: "tv" },
+    { path: "/tv/top_rated", mediaType: "tv" },
+  ];
+  const lists = await Promise.all(sources.map(async (source) => ({
+    source,
+    list: await tmdbFetch<TmdbListResponse>(env, source.path, { page: 1 }),
+  })));
+  const seen = new Set<string>();
+  const messages: MediaMessage[] = [];
+  for (const { source, list } of lists) {
+    for (const item of list.results) {
+      const mediaType: MediaType = item.media_type === "tv" ? "tv" : item.media_type === "movie" ? "movie" : source.mediaType;
+      const key = `${mediaType}:${item.id}`;
+      if (seen.has(key) || messages.length >= limit) continue;
+      seen.add(key);
+      messages.push({ kind: "media", mediaType, tmdbId: item.id });
+    }
+  }
+  for (let index = 0; index < messages.length; index += 100) {
+    await env.MEDIA_SYNC_QUEUE.sendBatch(messages.slice(index, index + 100).map((body) => ({ body })));
+  }
+  return messages.length;
+}
+
+async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetail): Promise<void> {
+  const updatedAt = now();
+  const genres = detail.genres ?? [];
+  const cast = (detail.credits?.cast ?? []).slice(0, 10);
+  const statements: D1PreparedStatement[] = [
+    env.CATALOG_DB.prepare(`INSERT INTO media (
+      media_type, tmdb_id, title, original_title, overview, release_date, vote_average, vote_count,
+      popularity, poster_path, backdrop_path, runtime, seasons, status, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(media_type, tmdb_id) DO UPDATE SET
+      title=excluded.title, original_title=excluded.original_title, overview=excluded.overview,
+      release_date=excluded.release_date, vote_average=excluded.vote_average, vote_count=excluded.vote_count,
+      popularity=excluded.popularity, poster_path=excluded.poster_path, backdrop_path=excluded.backdrop_path,
+      runtime=excluded.runtime, seasons=excluded.seasons, status=excluded.status, updated_at=excluded.updated_at`)
+      .bind(
+        mediaType, detail.id, detail.title ?? detail.name ?? "Untitled", detail.original_title ?? detail.original_name ?? null,
+        detail.overview ?? "", detail.release_date ?? detail.first_air_date ?? "", detail.vote_average ?? 0,
+        detail.vote_count ?? 0, detail.popularity ?? 0, detail.poster_path ?? null, detail.backdrop_path ?? null,
+        detail.runtime ?? null, detail.number_of_seasons ?? null, detail.status ?? null, updatedAt,
+      ),
+    env.CATALOG_DB.prepare("DELETE FROM media_genres WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
+    env.CATALOG_DB.prepare("DELETE FROM media_cast WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
+  ];
+  for (const genre of genres) {
+    statements.push(
+      env.CATALOG_DB.prepare("INSERT INTO genres (genre_id, name, updated_at) VALUES (?, ?, ?) ON CONFLICT(genre_id) DO UPDATE SET name=excluded.name, updated_at=excluded.updated_at")
+        .bind(genre.id, genre.name, updatedAt),
+      env.CATALOG_DB.prepare("INSERT INTO media_genres (media_type, tmdb_id, genre_id) VALUES (?, ?, ?)")
+        .bind(mediaType, detail.id, genre.id),
+    );
+  }
+  for (const person of cast) {
+    statements.push(env.CATALOG_DB.prepare(
+      "INSERT INTO media_cast (media_type, tmdb_id, person_id, name, character_name, profile_path, cast_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    ).bind(mediaType, detail.id, person.id, person.name, person.character ?? "", person.profile_path ?? null, person.order ?? 0));
+  }
+  await env.CATALOG_DB.batch(statements);
+
+  const imageMessages: ImageMessage[] = [];
+  if (detail.poster_path && isValidImagePath(detail.poster_path)) imageMessages.push({ kind: "image", imageType: "poster", path: detail.poster_path });
+  if (detail.backdrop_path && isValidImagePath(detail.backdrop_path)) imageMessages.push({ kind: "image", imageType: "backdrop", path: detail.backdrop_path });
+  if (imageMessages.length) await env.IMAGE_INGEST_QUEUE.sendBatch(imageMessages.map((body) => ({ body })));
+}
+
+async function processMedia(env: SyncEnv, message: MediaMessage): Promise<void> {
+  const detail = await tmdbFetch<TmdbDetail>(env, `/${message.mediaType}/${message.tmdbId}`, {
+    append_to_response: "credits,external_ids",
+  });
+  await storeDetail(env, message.mediaType, detail);
+}
+
+async function processImage(env: SyncEnv, message: ImageMessage): Promise<void> {
+  if (!isValidImagePath(message.path)) throw new Error("Invalid TMDB image path");
+  const key = imageKey(message);
+  if (await env.TMDB_IMAGES.head(key)) return;
+  const response = await fetch(`https://image.tmdb.org/t/p/original${message.path}`, { signal: AbortSignal.timeout(20_000) });
+  if (!response.ok) {
+    const error = new Error(`TMDB image ${response.status}`) as Error & { status?: number; retryAfter?: string | null };
+    error.status = response.status;
+    error.retryAfter = response.headers.get("Retry-After");
+    throw error;
+  }
+  const contentType = response.headers.get("Content-Type") ?? "";
+  const expectedMaximum = maxImageBytes[message.imageType];
+  const contentLength = Number(response.headers.get("Content-Length") ?? 0);
+  if (!contentType.startsWith("image/") || (contentLength && contentLength > expectedMaximum)) throw new Error("Rejected TMDB image response");
+  const body = await response.arrayBuffer();
+  if (body.byteLength > expectedMaximum) throw new Error("TMDB image exceeds size limit");
+  await env.TMDB_IMAGES.put(key, body, {
+    httpMetadata: { contentType, cacheControl: "public, max-age=2592000" },
+    customMetadata: { source: "tmdb", sourcePath: message.path, cachedAt: now() },
+  });
+}
+
+function isRetryable(error: unknown): boolean {
+  const status = (error as { status?: number }).status;
+  return !status || status === 429 || status >= 500;
+}
+
+function errorDelay(error: unknown, attempt: number): number {
+  return retryDelay(attempt, (error as { retryAfter?: string | null }).retryAfter);
+}
+
+export class TmdbRateLimiter implements DurableObject {
+  constructor(private readonly state: DurableObjectState) {}
+
+  async fetch(request: Request): Promise<Response> {
+    if (new URL(request.url).pathname !== "/take") return new Response("Not found", { status: 404 });
+    const timestamp = Date.now();
+    const nextAt = (await this.state.storage.get<number>("next-at")) ?? timestamp;
+    const grantedAt = Math.max(timestamp, nextAt);
+    await this.state.storage.put("next-at", grantedAt + 334);
+    return Response.json({ waitMs: Math.max(0, grantedAt - timestamp) });
+  }
+}
+
+export default {
+  async scheduled(_controller: ScheduledController, env: SyncEnv): Promise<void> {
+    const startedAt = now();
+    const run = await env.CATALOG_DB.prepare("INSERT INTO sync_runs (trigger, started_at, status) VALUES (?, ?, ?)")
+      .bind("cron", startedAt, "running").run();
+    try {
+      const seededCount = await enqueueSeeds(env, 100);
+      await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, seeded_count = ?, completed_at = ? WHERE id = ?")
+        .bind("completed", seededCount, now(), run.meta.last_row_id).run();
+    } catch (error) {
+      await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, error = ?, completed_at = ? WHERE id = ?")
+        .bind("failed", error instanceof Error ? error.message : String(error), now(), run.meta.last_row_id).run();
+      throw error;
+    }
+  },
+
+  async queue(batch: MessageBatch<SyncMessage>, env: SyncEnv): Promise<void> {
+    for (const message of batch.messages) {
+      try {
+        if (message.body.kind === "media") await processMedia(env, message.body);
+        else await processImage(env, message.body);
+        message.ack();
+      } catch (error) {
+        if (isRetryable(error) && message.attempts < 5) message.retry({ delaySeconds: errorDelay(error, message.attempts) });
+        else message.ack();
+      }
+    }
+  },
+
+  async fetch(request: Request, env: SyncEnv): Promise<Response> {
+    const url = new URL(request.url);
+    if (request.method === "GET" && url.pathname === "/health") return Response.json({ ok: true });
+    if (request.method === "POST" && url.pathname === "/admin/seed") {
+      if (!env.SYNC_ADMIN_TOKEN || request.headers.get("Authorization") !== `Bearer ${env.SYNC_ADMIN_TOKEN}`) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      const rawLimit = Number(url.searchParams.get("limit") ?? 100);
+      const seededCount = await enqueueSeeds(env, Math.max(1, Math.min(500, Math.floor(rawLimit))));
+      return Response.json({ queued: seededCount });
+    }
+    return new Response("Not found", { status: 404 });
+  },
+};

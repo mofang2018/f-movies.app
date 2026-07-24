@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "f-movies-catalog-sync",
+  "main": "workers/catalog-sync.ts",
+  "compatibility_date": "2026-07-22",
+  "workers_dev": false,
+  "observability": { "enabled": true },
+  "triggers": { "crons": ["17 * * * *"] },
+  "d1_databases": [
+    {
+      "binding": "CATALOG_DB",
+      "database_name": "f-movies-catalog",
+      "database_id": "0f662055-f012-4f1c-9570-c0760488f5ca",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "TMDB_IMAGES", "bucket_name": "f-movies-tmdb-images" }
+  ],
+  "queues": {
+    "producers": [
+      { "binding": "MEDIA_SYNC_QUEUE", "queue": "f-movies-media-sync" },
+      { "binding": "IMAGE_INGEST_QUEUE", "queue": "f-movies-image-ingest" }
+    ],
+    "consumers": [
+      { "queue": "f-movies-media-sync", "max_batch_size": 10, "max_retries": 5, "max_concurrency": 4 },
+      { "queue": "f-movies-image-ingest", "max_batch_size": 10, "max_retries": 5, "max_concurrency": 2 }
+    ]
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "TMDB_RATE_LIMITER", "class_name": "TmdbRateLimiter" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["TmdbRateLimiter"] }
+  ]
+}

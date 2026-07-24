@@ -7,6 +7,8 @@
     "dev": "F_MOVIES_VITE_CACHE_DIR=node_modules/.vite-dev astro dev",
     "build": "F_MOVIES_VITE_CACHE_DIR=node_modules/.vite-build astro check && F_MOVIES_VITE_CACHE_DIR=node_modules/.vite-build astro build",
     "data:refresh": "node scripts/download-tmdb-snapshot.mjs",
+    "sync:migrate": "wrangler d1 migrations apply f-movies-catalog --remote --config wrangler.sync.jsonc",
+    "sync:deploy": "wrangler deploy --config wrangler.sync.jsonc",
     "preview": "F_MOVIES_VITE_CACHE_DIR=node_modules/.vite-dev astro dev",
     "check": "F_MOVIES_VITE_CACHE_DIR=node_modules/.vite-check astro check",
     "deploy": "npm run build && wrangler deploy",
