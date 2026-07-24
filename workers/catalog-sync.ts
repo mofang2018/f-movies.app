@@ -165,7 +165,17 @@ async function enqueueSeeds(env: SyncEnv, limit: number): Promise<number> {
     VALUES (?, ?, ?, ?)
     ON CONFLICT(job_key) DO UPDATE SET state=excluded.state, updated_at=excluded.updated_at`)
     .bind("seed-page-cursor", "catalog-page", String(nextPage), now()).run();
+  if (page >= 500) {
+    await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = ?, updated_at = ? WHERE job_key = ?")
+      .bind("done", now(), "catalog-initial-import").run();
+  }
   return messages.length;
+}
+
+async function isInitialImportRunning(env: SyncEnv): Promise<boolean> {
+  const job = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
+    .bind("catalog-initial-import").first<{ state: string }>();
+  return !job || job.state !== "done";
 }
 
 /**
@@ -377,10 +387,12 @@ export default {
     try {
       const countryBackfillCount = await runCountryBackfill(env);
       const trailerBackfillCount = await runTrailerBackfill(env);
-      // Complete the one-off local country index before spending Queue
-      // operations on ongoing catalog discovery.
-      const isDiscoverySlot = new Date().getUTCMinutes() === 5;
-      const seededCount = countryBackfillCount > 0 || !isDiscoverySlot ? 0 : await enqueueSeeds(env, 25);
+      // During the one-time import, advance the discovery cursor on every
+      // scheduled run. Later refreshes are deliberately reduced to daily.
+      const timestamp = new Date();
+      const initialImportRunning = await isInitialImportRunning(env);
+      const isDailyRefreshSlot = timestamp.getUTCHours() === 0 && timestamp.getUTCMinutes() === 5;
+      const seededCount = initialImportRunning || isDailyRefreshSlot ? await enqueueSeeds(env, initialImportRunning ? 100 : 25) : 0;
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, seeded_count = ?, completed_at = ? WHERE id = ?")
         .bind("completed", countryBackfillCount + trailerBackfillCount + seededCount, now(), run.meta.last_row_id).run();
     } catch (error) {
