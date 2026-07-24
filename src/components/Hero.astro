@@ -1,6 +1,7 @@
 ---
 import { CalendarDays, Info, Play, Star } from "@lucide/astro";
 import { getImageUrl } from "../lib/images";
+import { mediaUrl } from "../lib/media-url";
 import type { MediaItem } from "../types/media";
 
 interface Props {
@@ -35,8 +36,8 @@ const slides = items.length > 0 ? items : Astro.props.items.slice(0, 1);
         </div>
         <p>{item.overview || "Discover this title, its cast, details and similar recommendations."}</p>
         <div class="hero-actions">
-          <a class="button button-primary" href={`/${item.mediaType}/${item.id}`}><Play size={18} fill="currentColor" /> Explore title</a>
-          <a class="button button-secondary" href={`/${item.mediaType}/${item.id}`}><Info size={18} /> More info</a>
+          <a class="button button-primary" href={mediaUrl(item)}><Play size={18} fill="currentColor" /> Explore title</a>
+          <a class="button button-secondary" href={mediaUrl(item)}><Info size={18} /> More info</a>
         </div>
       </div>
     </article>

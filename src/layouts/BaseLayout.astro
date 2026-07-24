@@ -7,14 +7,17 @@ interface Props {
   title?: string;
   description?: string;
   image?: string;
+  structuredData?: Record<string, unknown>;
 }
 
 const {
   title = "F.MOVIES - Discover Movies and TV Series",
   description = "Explore trending movies, popular TV series, cast details and recommendations powered by TMDB.",
   image,
+  structuredData,
 } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
+const jsonLd = structuredData ? JSON.stringify(structuredData).replace(/</g, "\\u003c") : undefined;
 ---
 
 <!doctype html>
@@ -33,6 +36,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:url" content={canonical} />
     {image && <meta property="og:image" content={image} />}
     <meta name="twitter:card" content="summary_large_image" />
+    {jsonLd && <script is:inline type="application/ld+json" set:html={jsonLd}></script>}
     <title>{title}</title>
   </head>
   <body>

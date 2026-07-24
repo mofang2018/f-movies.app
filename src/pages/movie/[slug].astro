@@ -1,12 +1,15 @@
 ---
 import DetailsPage from "../../components/DetailsPage.astro";
+import { mediaIdFromSlug, mediaPath } from "../../lib/media-url";
 import { getTmdbToken, TmdbClient } from "../../lib/tmdb";
 
-const id = Number(Astro.params.id);
-if (!Number.isInteger(id) || id <= 0) return Astro.redirect("/movies");
+const id = mediaIdFromSlug(Astro.params.slug);
+if (!id) return Astro.redirect("/movies", 302);
 Astro.response.headers.set("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
 const client = new TmdbClient(getTmdbToken());
 const details = await client.getDetails("movie", id);
+const canonicalPath = mediaPath("movie", details.id, details.title);
+if (Astro.url.pathname !== canonicalPath) return Astro.redirect(canonicalPath, 301);
 ---
 
 <DetailsPage details={details} />

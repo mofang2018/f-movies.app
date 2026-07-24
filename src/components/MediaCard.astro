@@ -1,6 +1,7 @@
 ---
 import { CirclePlay, Star } from "@lucide/astro";
 import { getImageUrl } from "../lib/images";
+import { mediaUrl } from "../lib/media-url";
 import type { MediaItem } from "../types/media";
 
 interface Props {
@@ -9,7 +10,7 @@ interface Props {
 }
 
 const { item, priority = false } = Astro.props;
-const href = `/${item.mediaType}/${item.id}`;
+const href = mediaUrl(item);
 const year = item.releaseDate ? item.releaseDate.slice(0, 4) : "TBA";
 ---
 

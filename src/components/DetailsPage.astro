@@ -1,6 +1,7 @@
 ---
 import { CalendarDays, Clock3, Play, Star, X } from "@lucide/astro";
 import { getImageUrl } from "../lib/images";
+import { mediaPath } from "../lib/media-url";
 import type { MediaDetails } from "../types/media";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import MediaSection from "./MediaSection.astro";
@@ -16,9 +17,28 @@ const duration = details.mediaType === "movie"
   : details.seasons ? `${details.seasons} season${details.seasons === 1 ? "" : "s"}` : "Seasons TBA";
 const description = details.overview || `Explore ${details.title}, its cast and related titles.`;
 const shareImage = details.backdropPath ? getImageUrl(details.backdropPath, "w1280") : undefined;
+const canonicalPath = mediaPath(details.mediaType, details.id, details.title);
+const pageDescription = description.length > 160 ? `${description.slice(0, 157).trimEnd()}...` : description;
+const mediaLabel = details.mediaType === "movie" ? "Movie" : "TV Series";
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": details.mediaType === "movie" ? "Movie" : "TVSeries",
+  name: details.title,
+  description: pageDescription,
+  url: new URL(canonicalPath, Astro.site).href,
+  ...(shareImage ? { image: shareImage } : {}),
+  ...(details.releaseDate ? { datePublished: details.releaseDate } : {}),
+  ...(details.genres.length ? { genre: details.genres.map((genre) => genre.name) } : {}),
+  ...(details.cast.length ? { actor: details.cast.map((person) => ({ "@type": "Person", name: person.name })) } : {}),
+};
 ---
 
-<BaseLayout title={`${details.title} - F.MOVIES`} description={description} image={shareImage}>
+<BaseLayout
+  title={`${details.title} (${year}) - ${mediaLabel} Details | F.MOVIES`}
+  description={pageDescription}
+  image={shareImage}
+  structuredData={structuredData}
+>
   <article class="details">
     <section class="details-hero">
       <img class="details-backdrop" src={getImageUrl(details.backdropPath, "w1280")} alt="" width="1280" height="720" />
