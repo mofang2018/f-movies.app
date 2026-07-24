@@ -1,4 +1,4 @@
-# F.MOVIES
+# FMOVIES
 
 An Astro and Cloudflare movie discovery site powered by TMDB. The project follows the research, component specification and visual QA workflow from `JCodesMore/ai-website-cloner-template`, adapted to Astro for a smaller runtime footprint.
 

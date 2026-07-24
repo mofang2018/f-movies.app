@@ -17,7 +17,7 @@ const isCountryActive = currentPath.startsWith("/country/");
 
 <header class="site-header">
   <div class="header-inner">
-    <a class="brand" href="/" aria-label="F.MOVIES landing page">F<span>.MOVIES</span></a>
+    <a class="brand" href="/" aria-label="FMOVIES landing page">FMOVIES</a>
 
     <nav class="desktop-nav" aria-label="Primary navigation">
       <a class:list={{ active: isActive("/home") }} href="/home" aria-current={isActive("/home") ? "page" : undefined}>Home</a>
@@ -110,7 +110,7 @@ const isCountryActive = currentPath.startsWith("/country/");
 
 <style>
   .site-header {
-    --header-accent: #00acc1;
+    --header-accent: #347f9c;
     --header-height: 66px;
     position: sticky;
     top: 0;
@@ -136,17 +136,15 @@ const isCountryActive = currentPath.startsWith("/country/");
     flex: 0 0 140px;
     align-items: center;
     justify-content: center;
-    background: var(--header-accent);
+    border-radius: 6px;
+    background: linear-gradient(135deg, #3f8ead, #286d89);
     color: #fff;
-    font-size: 25px;
+    font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+    font-size: 28px;
     font-weight: 900;
+    letter-spacing: -1.2px;
     line-height: 1;
-  }
-
-  .brand span {
-    margin-left: 3px;
-    font-size: 17px;
-    font-weight: 800;
+    text-transform: uppercase;
   }
 
   .desktop-nav {

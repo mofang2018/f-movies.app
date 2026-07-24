@@ -23,10 +23,10 @@ const searchPaginationPath = query ? `/search?${new URLSearchParams({ q: query }
 ---
 
 <BaseLayout
-  title={query ? `Search ${query} — Movies & TV Series | F.MOVIES` : "Search Movies & TV Series — Find Titles & Details | F.MOVIES"}
+  title={query ? `Search ${query} — Movies & TV Series | FMOVIES` : "Search Movies & TV Series — Find Titles & Details | FMOVIES"}
   description={query
-    ? `Search results for ${query} across the F.MOVIES catalogue. Explore movie and TV-series details, ratings, cast information and related titles before deciding what to watch next.`
-    : "Search the F.MOVIES catalogue for movie and TV-series details, ratings, cast information and related recommendations to help you choose what to explore next."}
+    ? `Search results for ${query} across the FMOVIES catalogue. Explore movie and TV-series details, ratings, cast information and related titles before deciding what to watch next.`
+    : "Search the FMOVIES catalogue for movie and TV-series details, ratings, cast information and related recommendations to help you choose what to explore next."}
   robots="noindex,follow"
   canonicalPath={searchCanonical}
   paginationLinks={paginationLinks(searchPaginationPath, catalog.page, catalog.totalPages)}

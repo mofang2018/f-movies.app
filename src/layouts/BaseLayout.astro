@@ -3,6 +3,8 @@ import SiteFooter from "../components/SiteFooter.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import "../styles/global.css";
 
+const googleAnalyticsId = "G-M5LYPZWPGF";
+
 interface Props {
   title?: string;
   description?: string;
@@ -17,7 +19,7 @@ interface Props {
 }
 
 const {
-  title = "F.MOVIES - Discover Movies and TV Series",
+  title = "FMOVIES - Discover Movies and TV Series",
   description = "Explore trending movies, popular TV series, cast details and recommendations powered by TMDB.",
   image: suppliedImage,
   imageWidth = 1200,
@@ -40,7 +42,7 @@ const jsonLdData = structuredData ?? {
 const jsonLd = JSON.stringify(jsonLdData).replace(/</g, "\\u003c");
 Astro.response.headers.set(
   "Content-Security-Policy",
-  "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; img-src 'self' data: https://images.f-movies.app https://f-movies-images.ericfang2013.workers.dev https://image.tmdb.org; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-src https://www.youtube-nocookie.com",
+  "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; img-src 'self' data: https://images.f-movies.app https://f-movies-images.ericfang2013.workers.dev https://image.tmdb.org https://www.google-analytics.com; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com; frame-src https://www.youtube-nocookie.com",
 );
 ---
 
@@ -59,7 +61,7 @@ Astro.response.headers.set(
     <link rel="apple-touch-icon" href="/favicon.svg" />
     <link rel="manifest" href="/site.webmanifest" />
     <meta property="og:type" content={openGraphType} />
-    <meta property="og:site_name" content="F.MOVIES" />
+    <meta property="og:site_name" content="FMOVIES" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
@@ -71,6 +73,13 @@ Astro.response.headers.set(
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={image} />
+    <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`}></script>
+    <script is:inline define:vars={{ googleAnalyticsId }}>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(...args) { window.dataLayer.push(args); }
+      gtag("js", new Date());
+      gtag("config", googleAnalyticsId);
+    </script>
     <script is:inline type="application/ld+json" set:html={jsonLd}></script>
     <title>{title}</title>
   </head>

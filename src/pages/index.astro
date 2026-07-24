@@ -6,7 +6,7 @@ Astro.response.headers.set("Cache-Control", "public, s-maxage=86400, stale-while
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  name: "F.MOVIES",
+  name: "FMOVIES",
   alternateName: "fmovies",
   url: Astro.site?.href,
   potentialAction: {
@@ -18,7 +18,7 @@ const structuredData = {
 ---
 
 <BaseLayout
-  title="fmovies — Discover Free Movies & TV Series | F.MOVIES"
+  title="fmovies — Discover Free Movies & TV Series | FMOVIES"
   description="Explore fmovies to search movie and TV-series information, browse genres, countries, ratings and cast details, and discover free movies worth exploring."
   structuredData={structuredData}
 >
@@ -26,7 +26,7 @@ const structuredData = {
     <div class="landing-orb landing-orb-one"></div>
     <div class="landing-orb landing-orb-two"></div>
     <div class="landing-hero-content container">
-      <span class="landing-kicker">F.MOVIES discovery guide</span>
+      <span class="landing-kicker">FMOVIES discovery guide</span>
       <h1>fmovies: discover free movies and TV series</h1>
       <p>Looking for free movies to explore? Search titles, browse popular genres and countries, and build your next watchlist with fmovies.</p>
       <form class="landing-search" action="/search" method="get">
@@ -47,7 +47,7 @@ const structuredData = {
         <span class="section-kicker">A simpler starting point</span>
         <h2 id="what-is-fmovies">What is fmovies?</h2>
       </div>
-      <p>F.MOVIES is a fast catalogue for discovering movie and TV-series details. Use it to search titles, compare ratings, browse cast information, or follow a genre when you are deciding what to watch next.</p>
+      <p>FMOVIES is a fast catalogue for discovering movie and TV-series details. Use it to search titles, compare ratings, browse cast information, or follow a genre when you are deciding what to watch next.</p>
     </section>
 
     <section class="discovery-cards" aria-label="Browse fmovies">
@@ -85,7 +85,7 @@ const structuredData = {
     </section>
 
     <section class="landing-faq" aria-labelledby="fmovies-faq">
-      <span class="section-kicker">F.MOVIES FAQ</span>
+      <span class="section-kicker">FMOVIES FAQ</span>
       <h2 id="fmovies-faq">Find more with fmovies</h2>
       <details>
         <summary>Can I search fmovies by title?</summary>
@@ -97,7 +97,7 @@ const structuredData = {
       </details>
       <details>
         <summary>Where does the catalogue information come from?</summary>
-        <p>F.MOVIES uses TMDB metadata for movie and TV-series information. F.MOVIES does not host or stream video files.</p>
+        <p>FMOVIES uses TMDB metadata for movie and TV-series information. FMOVIES does not host or stream video files.</p>
       </details>
     </section>
   </div>

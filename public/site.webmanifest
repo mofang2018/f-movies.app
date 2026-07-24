@@ -1,7 +1,7 @@
 {
-  "name": "F.MOVIES",
-  "short_name": "F.MOVIES",
-  "description": "Discover movies and TV series with F.MOVIES.",
+  "name": "FMOVIES",
+  "short_name": "FMOVIES",
+  "description": "Discover movies and TV series with FMOVIES.",
   "start_url": "/",
   "display": "browser",
   "background_color": "#1e2129",

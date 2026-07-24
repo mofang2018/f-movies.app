@@ -22,9 +22,9 @@ const freeMovieLinks = [
 <footer class="site-footer">
   <div class="footer-grid container">
     <section class="footer-brand" aria-labelledby="footer-brand-title">
-      <h2 id="footer-brand-title">F<span>.</span>MOVIES</h2>
+      <h2 id="footer-brand-title">FMOVIES</h2>
       <p>Discover movies and TV series through a calm, fast interface.</p>
-      <p class="disclaimer">F.MOVIES does not host or stream video files.</p>
+      <p class="disclaimer">FMOVIES does not host or stream video files.</p>
     </section>
     <nav aria-label="Genre links">
       <h2>Genres</h2>
@@ -40,7 +40,7 @@ const freeMovieLinks = [
     </nav>
   </div>
   <div class="footer-bottom container">
-    <p>© {new Date().getFullYear()} F.MOVIES. All rights reserved.</p>
+    <p>© {new Date().getFullYear()} FMOVIES. All rights reserved.</p>
     <a href="/dmca">DMCA</a>
   </div>
 </footer>
@@ -60,13 +60,18 @@ const freeMovieLinks = [
   }
 
   .footer-brand h2 {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 9px;
+    border-radius: 5px;
+    background: linear-gradient(135deg, #3f8ead, #286d89);
+    color: #fff;
+    font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+    letter-spacing: -0.8px;
     margin: 0 0 18px;
     font-size: 22px;
     line-height: 1;
-  }
-
-  .footer-brand h2 span {
-    color: var(--color-accent);
   }
 
   .footer-brand p {
