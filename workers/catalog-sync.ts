@@ -162,7 +162,7 @@ async function enqueueSeeds(env: SyncEnv, limit: number): Promise<number> {
  * One-time/backfillable enrichment for records that predate media_countries.
  * The job is opt-in through sync_jobs so normal cron runs stay inexpensive.
  */
-async function enqueueCountryBackfill(env: SyncEnv, limit = 100): Promise<number> {
+async function enqueueCountryBackfill(env: SyncEnv, limit = 25): Promise<number> {
   const job = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
     .bind("country-backfill-cursor").first<{ state: string }>();
   if (!job || job.state === "done") return 0;
