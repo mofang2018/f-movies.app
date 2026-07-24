@@ -23,6 +23,8 @@ npm run data:refresh
 
 This downloads metadata and TMDB image paths only. Image files stay on TMDB's CDN in development and are routed through the configured Cloudflare image host in production.
 
+For the planned API-driven bulk catalog sync, D1 metadata store and R2 image cache, see [the batch sync design](docs/API_BATCH_SYNC_DESIGN.md). The current `data:refresh` command remains the lightweight website-snapshot fallback until that architecture is implemented.
+
 ## Checks
 
 ```bash
