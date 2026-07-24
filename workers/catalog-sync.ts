@@ -111,6 +111,9 @@ async function tmdbFetch<T>(env: SyncEnv, path: string, params: Record<string, s
 }
 
 async function enqueueSeeds(env: SyncEnv, limit: number): Promise<number> {
+  const cursor = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
+    .bind("seed-page-cursor").first<{ state: string }>();
+  const page = Math.max(1, Math.min(500, Number(cursor?.state ?? 1) || 1));
   const sources: Array<{ path: string; mediaType: MediaType }> = [
     { path: "/trending/all/day", mediaType: "movie" },
     { path: "/trending/all/week", mediaType: "movie" },
@@ -123,7 +126,7 @@ async function enqueueSeeds(env: SyncEnv, limit: number): Promise<number> {
   ];
   const lists = await Promise.all(sources.map(async (source) => ({
     source,
-    list: await tmdbFetch<TmdbListResponse>(env, source.path, { page: 1 }),
+    list: await tmdbFetch<TmdbListResponse>(env, source.path, { page }),
   })));
   const seen = new Set<string>();
   const messages: MediaMessage[] = [];
@@ -139,6 +142,11 @@ async function enqueueSeeds(env: SyncEnv, limit: number): Promise<number> {
   for (let index = 0; index < messages.length; index += 100) {
     await env.MEDIA_SYNC_QUEUE.sendBatch(messages.slice(index, index + 100).map((body) => ({ body })));
   }
+  const nextPage = page >= 500 ? 1 : page + 1;
+  await env.CATALOG_DB.prepare(`INSERT INTO sync_jobs (job_key, job_type, state, updated_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(job_key) DO UPDATE SET state=excluded.state, updated_at=excluded.updated_at`)
+    .bind("seed-page-cursor", "catalog-page", String(nextPage), now()).run();
   return messages.length;
 }
 
