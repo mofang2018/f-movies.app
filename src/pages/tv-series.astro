@@ -2,13 +2,13 @@
 import MediaGrid from "../components/MediaGrid.astro";
 import Pagination from "../components/Pagination.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { canonicalPath, paginationLinks } from "../lib/seo";
+import { canonicalPath, catalogCacheControl, paginationLinks } from "../lib/seo";
 import { getTmdbToken, TmdbClient } from "../lib/tmdb";
 
 if (Astro.url.searchParams.get("page") === "1") return Astro.redirect("/tv-series", 301);
 const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
 const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
-Astro.response.headers.set("Cache-Control", "public, s-maxage=900, stale-while-revalidate=86400");
+Astro.response.headers.set("Cache-Control", catalogCacheControl);
 const client = new TmdbClient(getTmdbToken());
 const catalog = await client.getPopular("tv", page);
 if (catalog.totalPages > 0 && page > catalog.totalPages) return Astro.rewrite("/404");

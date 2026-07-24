@@ -4,9 +4,10 @@ import Hero from "../components/Hero.astro";
 import MediaSection from "../components/MediaSection.astro";
 import ShareStrip from "../components/ShareStrip.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { catalogCacheControl } from "../lib/seo";
 import { getTmdbToken, TmdbClient } from "../lib/tmdb";
 
-Astro.response.headers.set("Cache-Control", "public, s-maxage=900, stale-while-revalidate=86400");
+Astro.response.headers.set("Cache-Control", catalogCacheControl);
 const client = new TmdbClient(getTmdbToken());
 const data = await client.getHome();
 ---

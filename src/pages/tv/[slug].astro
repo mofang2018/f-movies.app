@@ -1,11 +1,12 @@
 ---
 import DetailsPage from "../../components/DetailsPage.astro";
 import { mediaIdFromSlug, mediaPath } from "../../lib/media-url";
+import { catalogCacheControl } from "../../lib/seo";
 import { getTmdbToken, TmdbClient } from "../../lib/tmdb";
 
 const id = mediaIdFromSlug(Astro.params.slug);
 if (!id) return Astro.rewrite("/404");
-Astro.response.headers.set("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
+Astro.response.headers.set("Cache-Control", catalogCacheControl);
 const client = new TmdbClient(getTmdbToken());
 const details = await client.getDetails("tv", id);
 const canonicalPath = mediaPath("tv", details.id, details.title);

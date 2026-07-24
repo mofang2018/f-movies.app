@@ -5,7 +5,7 @@ import Pagination from "../../components/Pagination.astro";
 import { navigationCountries } from "../../data/navigation";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { CatalogClient } from "../../lib/catalog";
-import { canonicalPath, paginationLinks } from "../../lib/seo";
+import { canonicalPath, catalogCacheControl, paginationLinks } from "../../lib/seo";
 
 const countrySlug = (Astro.params.code ?? "").toLowerCase();
 const country = navigationCountries.find((item) => item.slug === countrySlug);
@@ -13,7 +13,7 @@ if (!country) return Astro.rewrite("/404");
 if (Astro.url.searchParams.get("page") === "1") return Astro.redirect(`/country/${countrySlug}`, 301);
 const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
 const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
-Astro.response.headers.set("Cache-Control", "public, s-maxage=900, stale-while-revalidate=86400");
+Astro.response.headers.set("Cache-Control", catalogCacheControl);
 const catalog = await new CatalogClient().getByCountry(country.code, page)
   ?? { page, totalPages: 0, totalResults: 0, results: [] };
 if (catalog.totalPages > 0 && page > catalog.totalPages) return Astro.rewrite("/404");
