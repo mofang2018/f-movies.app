@@ -1,0 +1,29 @@
+---
+import GenreStrip from "../components/GenreStrip.astro";
+import Hero from "../components/Hero.astro";
+import MediaSection from "../components/MediaSection.astro";
+import ShareStrip from "../components/ShareStrip.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getTmdbToken, TmdbClient } from "../lib/tmdb";
+
+Astro.response.headers.set("Cache-Control", "public, s-maxage=900, stale-while-revalidate=86400");
+const client = new TmdbClient(getTmdbToken());
+const data = await client.getHome();
+---
+
+<BaseLayout title="Movies & TV Series | F.MOVIES" description="Discover trending movies, popular TV series, cast details and recommendations powered by TMDB.">
+  <Hero items={data.trending} />
+  <ShareStrip />
+  <div class="container home-sections">
+    <MediaSection title="Trending now" eyebrow="This week" items={data.trending.slice(0, 12)} href="/movies" />
+    <MediaSection title="Popular movies" eyebrow="Big screen picks" items={data.movies.slice(0, 12)} href="/movies" />
+    <MediaSection title="Popular TV series" eyebrow="Series to start" items={data.tv.slice(0, 12)} href="/tv-series" />
+  </div>
+  <GenreStrip genres={data.genres} />
+</BaseLayout>
+
+<style>
+  .home-sections {
+    padding-bottom: 8px;
+  }
+</style>

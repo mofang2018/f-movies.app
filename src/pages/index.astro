@@ -1,29 +1,379 @@
 ---
-import GenreStrip from "../components/GenreStrip.astro";
-import Hero from "../components/Hero.astro";
-import MediaSection from "../components/MediaSection.astro";
-import ShareStrip from "../components/ShareStrip.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { getTmdbToken, TmdbClient } from "../lib/tmdb";
 
-Astro.response.headers.set("Cache-Control", "public, s-maxage=900, stale-while-revalidate=86400");
-const client = new TmdbClient(getTmdbToken());
-const data = await client.getHome();
+Astro.response.headers.set("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "F.MOVIES",
+  alternateName: "fmovies",
+  url: Astro.site?.href,
+  potentialAction: {
+    "@type": "SearchAction",
+    target: `${Astro.site?.href ?? "https://f-movies.app"}search?q={search_term_string}`,
+    "query-input": "required name=search_term_string",
+  },
+};
 ---
 
-<BaseLayout>
-  <Hero items={data.trending} />
-  <ShareStrip />
-  <div class="container home-sections">
-    <MediaSection title="Trending now" eyebrow="This week" items={data.trending.slice(0, 12)} href="/movies" />
-    <MediaSection title="Popular movies" eyebrow="Big screen picks" items={data.movies.slice(0, 12)} href="/movies" />
-    <MediaSection title="Popular TV series" eyebrow="Series to start" items={data.tv.slice(0, 12)} href="/tv-series" />
+<BaseLayout
+  title="fmovies – Discover Movies & TV Series | F.MOVIES"
+  description="Explore fmovies to search movie and TV-series information, browse genres and countries, and find free movies worth discovering."
+  structuredData={structuredData}
+>
+  <section class="landing-hero">
+    <div class="landing-orb landing-orb-one"></div>
+    <div class="landing-orb landing-orb-two"></div>
+    <div class="landing-hero-content container">
+      <span class="landing-kicker">F.MOVIES discovery guide</span>
+      <h1>fmovies: discover free movies and TV series</h1>
+      <p>Looking for free movies to explore? Search titles, browse popular genres and countries, and build your next watchlist with fmovies.</p>
+      <form class="landing-search" action="/search" method="get">
+        <label class="screen-reader-only" for="landing-query">Search fmovies</label>
+        <input id="landing-query" type="search" name="q" placeholder="Search movies and TV series" autocomplete="off" />
+        <button class="button button-primary" type="submit">Search fmovies</button>
+      </form>
+      <div class="landing-actions">
+        <a class="button button-primary" href="/home">Explore movies</a>
+        <a class="button button-secondary" href="/tv-series">Browse TV series</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="landing-content container">
+    <section class="intro-grid" aria-labelledby="what-is-fmovies">
+      <div>
+        <span class="section-kicker">A simpler starting point</span>
+        <h2 id="what-is-fmovies">What is fmovies?</h2>
+      </div>
+      <p>F.MOVIES is a fast catalogue for discovering movie and TV-series details. Use it to search titles, compare ratings, browse cast information, or follow a genre when you are deciding what to watch next.</p>
+    </section>
+
+    <section class="discovery-cards" aria-label="Browse fmovies">
+      <a href="/movies">
+        <span>01</span>
+        <h2>Movies</h2>
+        <p>Browse popular films, new discoveries, and highly rated titles.</p>
+      </a>
+      <a href="/tv-series">
+        <span>02</span>
+        <h2>TV series</h2>
+        <p>Find series details, seasons, cast, and related recommendations.</p>
+      </a>
+      <a href="/top-imdb">
+        <span>03</span>
+        <h2>Top rated</h2>
+        <p>Explore community-rated movie picks in one focused list.</p>
+      </a>
+    </section>
+
+    <section class="browse-grid" aria-labelledby="browse-fmovies">
+      <div>
+        <span class="section-kicker">Find your next title</span>
+        <h2 id="browse-fmovies">Browse fmovies your way</h2>
+        <p>Move from a broad search to a specific movie or TV-series page in a few clicks. The catalogue is organised around the ways people naturally look for free movies: title, genre, country, popularity, and rating.</p>
+      </div>
+      <nav aria-label="Featured discovery links">
+        <a href="/genre/28">Action movies</a>
+        <a href="/genre/35">Comedy movies</a>
+        <a href="/genre/27">Horror movies</a>
+        <a href="/genre/878">Science fiction</a>
+        <a href="/country/united-states">United States</a>
+        <a href="/country/japan">Japan</a>
+      </nav>
+    </section>
+
+    <section class="landing-faq" aria-labelledby="fmovies-faq">
+      <span class="section-kicker">F.MOVIES FAQ</span>
+      <h2 id="fmovies-faq">Find more with fmovies</h2>
+      <details>
+        <summary>Can I search fmovies by title?</summary>
+        <p>Yes. Use the search box to find matching movies and TV series, then open a title page for its synopsis, rating, cast, and recommendations.</p>
+      </details>
+      <details>
+        <summary>How can I browse free movies to discover?</summary>
+        <p>Start with Movies, TV-Series, Top IMDb, a genre, or a country. These pages make it easier to narrow a broad free-movies search into titles that interest you.</p>
+      </details>
+      <details>
+        <summary>Where does the catalogue information come from?</summary>
+        <p>F.MOVIES uses TMDB metadata for movie and TV-series information. F.MOVIES does not host or stream video files.</p>
+      </details>
+    </section>
   </div>
-  <GenreStrip genres={data.genres} />
 </BaseLayout>
 
 <style>
-  .home-sections {
-    padding-bottom: 8px;
+  .landing-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    min-height: 580px;
+    padding: 128px 0 112px;
+    background:
+      linear-gradient(105deg, rgba(11, 13, 17, 0.98) 4%, rgba(19, 27, 28, 0.91) 52%, rgba(28, 39, 22, 0.84)),
+      #151a1c;
+  }
+
+  .landing-orb {
+    position: absolute;
+    z-index: -1;
+    border-radius: 999px;
+    filter: blur(5px);
+    opacity: 0.46;
+  }
+
+  .landing-orb-one {
+    top: -190px;
+    right: -50px;
+    width: 650px;
+    height: 650px;
+    background: radial-gradient(circle, #92c32e 0%, rgba(146, 195, 46, 0) 68%);
+  }
+
+  .landing-orb-two {
+    right: 27%;
+    bottom: -290px;
+    width: 540px;
+    height: 540px;
+    background: radial-gradient(circle, #00778a 0%, rgba(0, 119, 138, 0) 68%);
+  }
+
+  .landing-hero-content {
+    max-width: calc(var(--content-width) - 140px);
+    margin-left: max(24px, calc((100vw - var(--content-width)) / 2));
+  }
+
+  .landing-kicker {
+    display: block;
+    margin-bottom: 15px;
+    color: var(--color-accent);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+
+  .landing-hero h1 {
+    max-width: 760px;
+    margin: 0;
+    font-size: clamp(42px, 6vw, 74px);
+    letter-spacing: -0.045em;
+    line-height: 0.99;
+  }
+
+  .landing-hero p {
+    max-width: 650px;
+    margin: 22px 0 0;
+    color: #d1d6d5;
+    font-size: clamp(17px, 2vw, 20px);
+  }
+
+  .landing-search {
+    display: flex;
+    width: min(100%, 650px);
+    gap: 9px;
+    margin-top: 32px;
+  }
+
+  .landing-search input {
+    min-width: 0;
+    flex: 1;
+    height: 46px;
+    padding: 0 16px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: var(--radius);
+    outline: 0;
+    background: rgba(10, 13, 15, 0.7);
+    color: #fff;
+  }
+
+  .landing-search input:focus {
+    border-color: var(--color-accent);
+  }
+
+  .landing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .landing-content {
+    padding-top: 74px;
+    padding-bottom: 96px;
+  }
+
+  .intro-grid,
+  .browse-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 64px;
+    align-items: start;
+  }
+
+  .intro-grid h2,
+  .browse-grid h2,
+  .landing-faq h2 {
+    margin: 7px 0 0;
+    font-size: clamp(28px, 3vw, 42px);
+    line-height: 1.1;
+  }
+
+  .intro-grid p,
+  .browse-grid p {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 17px;
+  }
+
+  .discovery-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin: 68px 0;
+  }
+
+  .discovery-cards a {
+    min-height: 218px;
+    padding: 26px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+  }
+
+  .discovery-cards a:hover {
+    border-color: rgba(183, 227, 43, 0.55);
+    background: var(--color-surface-raised);
+    transform: translateY(-3px);
+  }
+
+  .discovery-cards span {
+    color: var(--color-accent);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .discovery-cards h2 {
+    margin: 32px 0 8px;
+    font-size: 24px;
+  }
+
+  .discovery-cards p {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+
+  .browse-grid {
+    padding: 48px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, #242b2a, #1e222b);
+  }
+
+  .browse-grid nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .browse-grid nav a {
+    padding: 13px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+    color: #e7e9ea;
+    font-size: 14px;
+    transition: border-color var(--transition-fast), color var(--transition-fast);
+  }
+
+  .browse-grid nav a:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .landing-faq {
+    max-width: 850px;
+    margin: 82px auto 0;
+  }
+
+  .landing-faq details {
+    padding: 19px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .landing-faq summary {
+    color: #f4f5f7;
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  .landing-faq p {
+    margin: 12px 28px 0 0;
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+
+  @media (max-width: 760px) {
+    .landing-hero {
+      min-height: 520px;
+      padding: 94px 0 74px;
+    }
+
+    .landing-hero-content {
+      width: min(100% - 32px, var(--content-width));
+      margin-inline: auto;
+    }
+
+    .landing-search,
+    .intro-grid,
+    .browse-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .landing-search {
+      flex-direction: column;
+    }
+
+    .landing-search .button {
+      width: 100%;
+    }
+
+    .landing-content {
+      padding-top: 52px;
+      padding-bottom: 68px;
+    }
+
+    .intro-grid,
+    .browse-grid {
+      gap: 24px;
+    }
+
+    .discovery-cards {
+      grid-template-columns: 1fr;
+      margin: 44px 0;
+    }
+
+    .discovery-cards a {
+      min-height: 0;
+    }
+
+    .discovery-cards h2 {
+      margin-top: 20px;
+    }
+
+    .browse-grid {
+      padding: 28px;
+    }
+
+    .browse-grid nav {
+      grid-template-columns: 1fr;
+    }
+
+    .landing-faq {
+      margin-top: 58px;
+    }
   }
 </style>

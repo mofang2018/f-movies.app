@@ -16,10 +16,10 @@ const isCountryActive = currentPath.startsWith("/country/");
 
 <header class="site-header">
   <div class="header-inner">
-    <a class="brand" href="/" aria-label="F.MOVIES home">F<span>.MOVIES</span></a>
+    <a class="brand" href="/" aria-label="F.MOVIES landing page">F<span>.MOVIES</span></a>
 
     <nav class="desktop-nav" aria-label="Primary navigation">
-      <a class:list={{ active: isActive("/") }} href="/">Home</a>
+      <a class:list={{ active: isActive("/home") }} href="/home">Home</a>
 
       <details class:list={["nav-dropdown", { active: isGenreActive }]}>
         <summary>Genres <ChevronDown size={14} /></summary>
@@ -59,7 +59,7 @@ const isCountryActive = currentPath.startsWith("/country/");
       <button type="submit" aria-label="Search"><Search size={18} /></button>
     </form>
     <nav aria-label="Mobile navigation">
-      <a class:list={{ active: isActive("/") }} href="/">Home</a>
+      <a class:list={{ active: isActive("/home") }} href="/home">Home</a>
       <details open={isGenreActive}>
         <summary>Genres <ChevronDown size={15} /></summary>
         <div class="mobile-submenu">
