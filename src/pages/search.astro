@@ -12,7 +12,7 @@ if (Astro.url.searchParams.get("page") === "1") {
 }
 const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
 const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
-Astro.response.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=3600");
+Astro.response.headers.set("Cache-Control", "public, s-maxage=86400");
 const client = new TmdbClient(getTmdbToken());
 const catalog = await client.search(query, page);
 if (catalog.totalPages > 0 && page > catalog.totalPages) return Astro.rewrite("/404");

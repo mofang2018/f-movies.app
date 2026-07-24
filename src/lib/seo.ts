@@ -3,11 +3,11 @@ import type { MediaType } from "../types/media";
 
 export const siteOrigin = "https://f-movies.app";
 export const sitemapShardSize = 1_000;
-// The catalog is refreshed on a five-minute schedule during launch. Keep
-// sitemap and catalog HTML freshness aligned with that cadence while still
-// allowing Cloudflare's edge cache to absorb repeated crawler traffic.
-export const catalogCacheControl = "public, s-maxage=300";
-export const sitemapCacheControl = "public, s-maxage=300";
+// After the initial catalogue import, metadata changes are deliberately
+// infrequent. A 24-hour edge TTL keeps D1 reads and Worker work low while
+// each sitemap entry still retains its exact D1 updated_at value.
+export const catalogCacheControl = "public, s-maxage=86400";
+export const sitemapCacheControl = "public, s-maxage=86400";
 
 const xmlEscapes: Record<string, string> = {
   "&": "&amp;",
