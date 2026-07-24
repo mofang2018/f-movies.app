@@ -35,6 +35,10 @@ interface TmdbGenre {
   name: string;
 }
 
+interface TmdbCountry {
+  iso_3166_1?: string;
+}
+
 interface TmdbDetail {
   id: number;
   title?: string;
@@ -53,6 +57,8 @@ interface TmdbDetail {
   number_of_seasons?: number | null;
   status?: string;
   genres?: TmdbGenre[];
+  production_countries?: TmdbCountry[];
+  origin_country?: string[];
   credits?: {
     cast?: Array<{
       id: number;
@@ -152,9 +158,39 @@ async function enqueueSeeds(env: SyncEnv, limit: number): Promise<number> {
   return messages.length;
 }
 
+/**
+ * One-time/backfillable enrichment for records that predate media_countries.
+ * The job is opt-in through sync_jobs so normal cron runs stay inexpensive.
+ */
+async function enqueueCountryBackfill(env: SyncEnv, limit = 100): Promise<number> {
+  const job = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
+    .bind("country-backfill-cursor").first<{ state: string }>();
+  if (!job || job.state === "done") return 0;
+
+  const cursor = Math.max(0, Number(job.state) || 0);
+  const rows = await env.CATALOG_DB.prepare(`SELECT rowid, media_type, tmdb_id FROM media
+    WHERE rowid > ? ORDER BY rowid LIMIT ?`).bind(cursor, limit).all<{ rowid: number; media_type: MediaType; tmdb_id: number }>();
+  const messages: MediaMessage[] = rows.results.map((row) => ({
+    kind: "media",
+    mediaType: row.media_type,
+    tmdbId: row.tmdb_id,
+  }));
+  for (let index = 0; index < messages.length; index += 100) {
+    await env.MEDIA_SYNC_QUEUE.sendBatch(messages.slice(index, index + 100).map((body) => ({ body })));
+  }
+  const nextState = rows.results.length < limit ? "done" : String(rows.results.at(-1)?.rowid ?? cursor);
+  await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = ?, updated_at = ? WHERE job_key = ?")
+    .bind(nextState, now(), "country-backfill-cursor").run();
+  return messages.length;
+}
+
 async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetail): Promise<void> {
   const updatedAt = now();
   const genres = detail.genres ?? [];
+  const countryCodes = [...new Set([
+    ...(detail.production_countries ?? []).map((country) => country.iso_3166_1),
+    ...(detail.origin_country ?? []),
+  ].filter((code): code is string => /^[A-Z]{2}$/.test(code ?? "")))];
   const cast = (detail.credits?.cast ?? []).slice(0, 10);
   const statements: D1PreparedStatement[] = [
     env.CATALOG_DB.prepare(`INSERT INTO media (
@@ -174,6 +210,7 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
       ),
     env.CATALOG_DB.prepare("DELETE FROM media_genres WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
     env.CATALOG_DB.prepare("DELETE FROM media_cast WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
+    env.CATALOG_DB.prepare("DELETE FROM media_countries WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
   ];
   for (const genre of genres) {
     statements.push(
@@ -182,6 +219,11 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
       env.CATALOG_DB.prepare("INSERT INTO media_genres (media_type, tmdb_id, genre_id) VALUES (?, ?, ?)")
         .bind(mediaType, detail.id, genre.id),
     );
+  }
+  for (const countryCode of countryCodes) {
+    statements.push(env.CATALOG_DB.prepare(
+      "INSERT INTO media_countries (media_type, tmdb_id, country_code) VALUES (?, ?, ?)",
+    ).bind(mediaType, detail.id, countryCode));
   }
   for (const person of cast) {
     statements.push(env.CATALOG_DB.prepare(
@@ -202,7 +244,7 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
 
 async function processMedia(env: SyncEnv, message: MediaMessage): Promise<void> {
   const detail = await tmdbFetch<TmdbDetail>(env, `/${message.mediaType}/${message.tmdbId}`, {
-    append_to_response: "credits,external_ids",
+    append_to_response: "credits",
   });
   await storeDetail(env, message.mediaType, detail);
 }
@@ -258,9 +300,12 @@ export default {
     const run = await env.CATALOG_DB.prepare("INSERT INTO sync_runs (trigger, started_at, status) VALUES (?, ?, ?)")
       .bind("cron", startedAt, "running").run();
     try {
-      const seededCount = await enqueueSeeds(env, 25);
+      const [countryBackfillCount, seededCount] = await Promise.all([
+        enqueueCountryBackfill(env),
+        enqueueSeeds(env, 25),
+      ]);
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, seeded_count = ?, completed_at = ? WHERE id = ?")
-        .bind("completed", seededCount, now(), run.meta.last_row_id).run();
+        .bind("completed", countryBackfillCount + seededCount, now(), run.meta.last_row_id).run();
     } catch (error) {
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, error = ?, completed_at = ? WHERE id = ?")
         .bind("failed", error instanceof Error ? error.message : String(error), now(), run.meta.last_row_id).run();

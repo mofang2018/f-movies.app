@@ -4,16 +4,16 @@ import MediaGrid from "../../components/MediaGrid.astro";
 import Pagination from "../../components/Pagination.astro";
 import { navigationCountries } from "../../data/navigation";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { getTmdbToken, TmdbClient } from "../../lib/tmdb";
+import { CatalogClient } from "../../lib/catalog";
 
-const countryCode = (Astro.params.code ?? "").toUpperCase();
-const country = navigationCountries.find((item) => item.code === countryCode);
-if (!country) return Astro.redirect("/movies");
+const countrySlug = (Astro.params.code ?? "").toLowerCase();
+const country = navigationCountries.find((item) => item.slug === countrySlug);
+if (!country) return new Response(null, { status: 404 });
 const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
 const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
 Astro.response.headers.set("Cache-Control", "public, s-maxage=900, stale-while-revalidate=86400");
-const client = new TmdbClient(getTmdbToken());
-const catalog = await client.getByCountry(country.code, page);
+const catalog = await new CatalogClient().getByCountry(country.code, page)
+  ?? { page, totalPages: 0, totalResults: 0, results: [] };
 ---
 
 <BaseLayout title={`${country.name} Movies - F.MOVIES`} description={`Browse popular movies from ${country.name}.`}>
@@ -21,15 +21,15 @@ const catalog = await client.getByCountry(country.code, page);
     <div class="container">
       <span class="section-kicker">Browse by country</span>
       <h1>{country.name} movies</h1>
-      <p>Popular films originating from {country.name}.</p>
+      <p>Browse titles from the downloaded catalog associated with {country.name}.</p>
     </div>
   </header>
   <div class="page-content container">
     {catalog.results.length > 0 ? (
       <>
         <MediaGrid items={catalog.results} priorityCount={6} />
-        <Pagination page={catalog.page} totalPages={catalog.totalPages} pathname={`/country/${country.code}`} />
+        <Pagination page={catalog.page} totalPages={catalog.totalPages} pathname={`/country/${country.slug}`} />
       </>
-    ) : <EmptyState title="No country titles available" description={`The ${country.name} catalog is temporarily unavailable. Browse popular movies or try again later.`} />}
+    ) : <EmptyState title="No country titles available" description={`No downloaded titles from ${country.name} are available yet. The catalog will expand as the local sync completes.`} />}
   </div>
 </BaseLayout>

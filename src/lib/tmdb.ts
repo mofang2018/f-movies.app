@@ -1,7 +1,6 @@
 import { env } from "cloudflare:workers";
 import { CatalogClient } from "./catalog";
 import {
-  fallbackCountryPage,
   fallbackDetails,
   fallbackGenrePage,
   fallbackGenres,
@@ -173,17 +172,13 @@ export class TmdbClient {
   }
 
   async getByCountry(countryCode: string, page: number): Promise<PagedMedia> {
-    if (!this.token) return fallbackCountryPage(page);
     try {
-      const raw = await this.request<TmdbPagedRaw>("/discover/movie", {
-        with_origin_country: countryCode,
-        sort_by: "popularity.desc",
-        page,
-      });
-      return normalizePage(raw, "movie");
+      const catalog = await this.catalog.getByCountry(countryCode, page);
+      if (catalog) return catalog;
     } catch {
-      return fallbackCountryPage(page);
+      // Country pages are intentionally local-catalog only.
     }
+    return { page: Math.max(1, page), totalPages: 0, totalResults: 0, results: [] };
   }
 
   async getTopRated(page: number): Promise<PagedMedia> {

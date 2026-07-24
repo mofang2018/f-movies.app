@@ -132,6 +132,28 @@ export class CatalogClient {
     };
   }
 
+  async getByCountry(countryCode: string, page: number): Promise<PagedMedia | null> {
+    const database = db();
+    if (!database) return null;
+    const safePage = Math.max(1, page);
+    const offset = (safePage - 1) * pageSize;
+    const [countResult, rowsResult] = await database.batch([
+      database.prepare("SELECT COUNT(*) AS total FROM media_countries WHERE country_code = ? AND media_type = 'movie'").bind(countryCode),
+      database.prepare(`SELECT m.media_type, m.tmdb_id, m.title, m.overview, m.release_date, m.vote_average, m.poster_path, m.backdrop_path, m.runtime, m.seasons, m.status
+        FROM media m JOIN media_countries mc ON mc.media_type = m.media_type AND mc.tmdb_id = m.tmdb_id
+        WHERE mc.country_code = ? AND m.media_type = 'movie' ORDER BY m.popularity DESC LIMIT ? OFFSET ?`).bind(countryCode, pageSize, offset),
+    ]);
+    const total = Number((countResult.results[0] as { total?: number } | undefined)?.total ?? 0);
+    if (!total) return null;
+    const rows = rowsResult.results as CatalogMediaRow[];
+    return {
+      page: safePage,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      totalResults: total,
+      results: await rowsWithGenres(rows, database),
+    };
+  }
+
   async getTopRated(page: number): Promise<PagedMedia | null> {
     const database = db();
     if (!database) return null;

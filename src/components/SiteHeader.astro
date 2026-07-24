@@ -31,7 +31,7 @@ const isCountryActive = currentPath.startsWith("/country/");
       <details class:list={["nav-dropdown", { active: isCountryActive }]}>
         <summary>Country <ChevronDown size={14} /></summary>
         <div class="dropdown-panel country-panel">
-          {navigationCountries.map((country) => <a href={`/country/${country.code}`}>{country.name}</a>)}
+          {navigationCountries.map((country) => <a href={`/country/${country.slug}`}>{country.name}</a>)}
         </div>
       </details>
 
@@ -69,7 +69,7 @@ const isCountryActive = currentPath.startsWith("/country/");
       <details open={isCountryActive}>
         <summary>Country <ChevronDown size={15} /></summary>
         <div class="mobile-submenu">
-          {navigationCountries.map((country) => <a href={`/country/${country.code}`}>{country.name}</a>)}
+          {navigationCountries.map((country) => <a href={`/country/${country.slug}`}>{country.name}</a>)}
         </div>
       </details>
       <a class:list={{ active: isActive("/movies") }} href="/movies">Movies</a>
