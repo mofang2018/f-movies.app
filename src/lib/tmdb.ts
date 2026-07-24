@@ -38,6 +38,7 @@ interface TmdbMediaRaw {
     }>;
   };
   similar?: TmdbPagedRaw;
+  videos?: { results?: Array<{ site?: string; key?: string; type?: string; official?: boolean }> };
 }
 
 interface TmdbPagedRaw {
@@ -78,6 +79,15 @@ function normalizePage(raw: TmdbPagedRaw, mediaType: MediaType): PagedMedia {
       .filter((item) => item.media_type !== "person")
       .map((item) => normalizeMedia(item, mediaType)),
   };
+}
+
+function trailerKeyFor(raw: TmdbMediaRaw): string | null {
+  const videos = (raw.videos?.results ?? []).filter((video) => video.site === "YouTube" && /^[A-Za-z0-9_-]{11}$/.test(video.key ?? ""));
+  return videos.find((video) => video.type === "Trailer" && video.official)?.key
+    ?? videos.find((video) => video.type === "Trailer")?.key
+    ?? videos.find((video) => video.type === "Teaser" && video.official)?.key
+    ?? videos.find((video) => video.type === "Teaser")?.key
+    ?? null;
 }
 
 export function getTmdbToken(): string {
@@ -244,7 +254,7 @@ export class TmdbClient {
     if (!this.token) return fallbackDetails(mediaType, id);
     try {
       const raw = await this.request<TmdbMediaRaw>(`/${mediaType}/${id}`, {
-        append_to_response: "credits,similar",
+        append_to_response: "credits,similar,videos",
       });
       const base = normalizeMedia(raw, mediaType);
       return {
@@ -261,6 +271,7 @@ export class TmdbClient {
           profilePath: person.profile_path ?? null,
         })),
         similar: (raw.similar?.results ?? []).slice(0, 12).map((item) => normalizeMedia(item, mediaType)),
+        trailerKey: trailerKeyFor(raw),
       };
     } catch {
       return fallbackDetails(mediaType, id);

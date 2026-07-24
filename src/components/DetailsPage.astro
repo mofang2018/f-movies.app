@@ -20,6 +20,9 @@ const shareImage = details.backdropPath ? getImageUrl(details.backdropPath, "w12
 const canonicalPath = mediaPath(details.mediaType, details.id, details.title);
 const pageDescription = description.length > 160 ? `${description.slice(0, 157).trimEnd()}...` : description;
 const mediaLabel = details.mediaType === "movie" ? "Movie" : "TV Series";
+const trailerEmbedUrl = details.trailerKey
+  ? `https://www.youtube-nocookie.com/embed/${details.trailerKey}?autoplay=1&rel=0&modestbranding=1`
+  : null;
 const structuredData = {
   "@context": "https://schema.org",
   "@graph": [
@@ -74,7 +77,11 @@ const structuredData = {
             {details.genres.map((genre) => <a href={`/genre/${genre.id}`}>{genre.name}</a>)}
           </div>
           <div class="details-actions">
-            <button class="button button-primary" type="button" data-open-playback><Play size={18} fill="currentColor" /> Watch now</button>
+            {trailerEmbedUrl ? (
+              <button class="button button-primary" type="button" data-open-trailer><Play size={18} fill="currentColor" /> Watch trailer</button>
+            ) : (
+              <span class="trailer-unavailable">Trailer unavailable</span>
+            )}
             {details.status && <span>Status: {details.status}</span>}
           </div>
         </div>
@@ -106,26 +113,41 @@ const structuredData = {
     )}
   </article>
 
-  <dialog class="playback-dialog" data-playback-dialog>
-    <button class="dialog-close" type="button" aria-label="Close dialog" data-close-playback><X size={20} /></button>
-    <span class="dialog-icon"><Play size={28} fill="currentColor" /></span>
-    <h2>Playback is not available</h2>
-    <p>F.MOVIES currently provides discovery, metadata and recommendations only. No video files or third-party streams are hosted here.</p>
-    <button class="button button-primary" type="button" data-close-playback>Got it</button>
-  </dialog>
+  {trailerEmbedUrl && (
+    <dialog class="trailer-dialog" data-trailer-dialog>
+      <button class="dialog-close" type="button" aria-label="Close trailer" data-close-trailer><X size={20} /></button>
+      <div class="trailer-frame">
+        <iframe
+          title={`${details.title} trailer`}
+          data-trailer-src={trailerEmbedUrl}
+          allow="autoplay; encrypted-media; picture-in-picture"
+          allowfullscreen
+          referrerpolicy="strict-origin-when-cross-origin"
+        ></iframe>
+      </div>
+      <p>Trailer provided by YouTube. F.MOVIES does not host video files.</p>
+    </dialog>
+  )}
 
   <script>
-    const dialog = document.querySelector("[data-playback-dialog]");
-    const openButton = document.querySelector("[data-open-playback]");
-    const closeButtons = document.querySelectorAll("[data-close-playback]");
+    const dialog = document.querySelector("[data-trailer-dialog]");
+    const openButton = document.querySelector("[data-open-trailer]");
+    const closeButtons = document.querySelectorAll("[data-close-trailer]");
     openButton?.addEventListener("click", () => {
-      if (dialog instanceof HTMLDialogElement) dialog.showModal();
+      if (!(dialog instanceof HTMLDialogElement)) return;
+      const frame = dialog.querySelector("iframe[data-trailer-src]");
+      if (frame instanceof HTMLIFrameElement && !frame.getAttribute("src")) frame.src = frame.dataset.trailerSrc ?? "";
+      dialog.showModal();
     });
     closeButtons.forEach((button) => button.addEventListener("click", () => {
       if (dialog instanceof HTMLDialogElement) dialog.close();
     }));
     dialog?.addEventListener("click", (event) => {
       if (event.target === dialog && dialog instanceof HTMLDialogElement) dialog.close();
+    });
+    dialog?.addEventListener("close", () => {
+      const frame = dialog.querySelector("iframe");
+      if (frame instanceof HTMLIFrameElement) frame.src = "";
     });
   </script>
 </BaseLayout>
@@ -317,18 +339,23 @@ const structuredData = {
     padding-bottom: 70px;
   }
 
-  .playback-dialog {
-    width: min(480px, calc(100% - 32px));
-    padding: 36px;
+  .trailer-unavailable {
+    color: var(--color-muted);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .trailer-dialog {
+    width: min(960px, calc(100% - 32px));
+    padding: 14px 14px 18px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     background: var(--color-surface);
     color: var(--color-text);
-    text-align: center;
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
   }
 
-  .playback-dialog::backdrop {
+  .trailer-dialog::backdrop {
     background: rgba(8, 9, 11, 0.78);
     backdrop-filter: blur(5px);
   }
@@ -347,24 +374,21 @@ const structuredData = {
     cursor: pointer;
   }
 
-  .dialog-icon {
-    display: grid;
-    width: 58px;
-    height: 58px;
-    margin: 0 auto;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--color-accent);
-    color: #15170d;
+  .trailer-frame {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: var(--radius);
+    background: #090a0d;
   }
 
-  .playback-dialog h2 {
-    margin: 18px 0 7px;
-    font-size: 24px;
+  .trailer-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
   }
 
-  .playback-dialog p {
-    margin: 0 0 22px;
+  .trailer-dialog p {
+    margin: 13px 34px 0 2px;
     color: var(--color-muted);
     font-size: 14px;
   }
@@ -434,7 +458,7 @@ const structuredData = {
       display: none;
     }
 
-    .playback-dialog {
+    .trailer-dialog {
       padding: 32px 22px 26px;
     }
   }

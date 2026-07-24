@@ -39,6 +39,13 @@ interface TmdbCountry {
   iso_3166_1?: string;
 }
 
+interface TmdbVideo {
+  site?: string;
+  key?: string;
+  type?: string;
+  official?: boolean;
+}
+
 interface TmdbDetail {
   id: number;
   title?: string;
@@ -59,6 +66,7 @@ interface TmdbDetail {
   genres?: TmdbGenre[];
   production_countries?: TmdbCountry[];
   origin_country?: string[];
+  videos?: { results?: TmdbVideo[] };
   credits?: {
     cast?: Array<{
       id: number;
@@ -183,6 +191,50 @@ async function runCountryBackfill(env: SyncEnv, limit = 50): Promise<number> {
   return rows.results.length;
 }
 
+function trailerKeyFor(detail: TmdbDetail): string | null {
+  const videos = (detail.videos?.results ?? []).filter((video) => video.site === "YouTube" && /^[A-Za-z0-9_-]{11}$/.test(video.key ?? ""));
+  const preferred = videos.find((video) => video.type === "Trailer" && video.official)
+    ?? videos.find((video) => video.type === "Trailer")
+    ?? videos.find((video) => video.type === "Teaser" && video.official)
+    ?? videos.find((video) => video.type === "Teaser");
+  return preferred?.key ?? null;
+}
+
+/** One-time trailer enrichment for the catalogue that existed before trailers. */
+async function runTrailerBackfill(env: SyncEnv, limit = 50): Promise<number> {
+  const job = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
+    .bind("trailer-backfill-cursor").first<{ state: string }>();
+  if (!job || job.state === "done") return 0;
+
+  const cursor = Math.max(0, Number(job.state) || 0);
+  const rows = await env.CATALOG_DB.prepare(`SELECT rowid, media_type, tmdb_id FROM media
+    WHERE rowid > ? ORDER BY rowid LIMIT ?`).bind(cursor, limit).all<{ rowid: number; media_type: MediaType; tmdb_id: number }>();
+  let completed = 0;
+  let lastRowId = cursor;
+  for (const row of rows.results) {
+    const detail = await tmdbFetch<TmdbDetail>(env, `/${row.media_type}/${row.tmdb_id}`, { append_to_response: "videos" });
+    const trailerKey = trailerKeyFor(detail);
+    // This is a one-time forward-only job. Missing trailers do not need a
+    // tombstone, so skip a write for them and keep D1 usage low.
+    if (trailerKey) {
+      await env.CATALOG_DB.prepare(`INSERT INTO media_trailers (media_type, tmdb_id, youtube_key, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(media_type, tmdb_id) DO UPDATE SET youtube_key=excluded.youtube_key, updated_at=excluded.updated_at`)
+        .bind(row.media_type, row.tmdb_id, trailerKey, now()).run();
+    }
+    completed += 1;
+    lastRowId = row.rowid;
+    // Save a small checkpoint so a transient API or D1 error only repeats a
+    // few records on the next scheduled run.
+    if (completed % 10 === 0 || completed === rows.results.length) {
+      const state = completed === rows.results.length && rows.results.length < limit ? "done" : String(lastRowId);
+      await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = ?, updated_at = ? WHERE job_key = ?")
+        .bind(state, now(), "trailer-backfill-cursor").run();
+    }
+  }
+  return rows.results.length;
+}
+
 function countryCodesFor(detail: TmdbDetail): string[] {
   return [...new Set([
     ...(detail.production_countries ?? []).map((country) => country.iso_3166_1),
@@ -207,6 +259,7 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
   const updatedAt = now();
   const genres = detail.genres ?? [];
   const countryCodes = countryCodesFor(detail);
+  const trailerKey = trailerKeyFor(detail);
   const cast = (detail.credits?.cast ?? []).slice(0, 10);
   const statements: D1PreparedStatement[] = [
     env.CATALOG_DB.prepare(`INSERT INTO media (
@@ -227,6 +280,7 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
     env.CATALOG_DB.prepare("DELETE FROM media_genres WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
     env.CATALOG_DB.prepare("DELETE FROM media_cast WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
     env.CATALOG_DB.prepare("DELETE FROM media_countries WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
+    env.CATALOG_DB.prepare("DELETE FROM media_trailers WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
   ];
   for (const genre of genres) {
     statements.push(
@@ -240,6 +294,11 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
     statements.push(env.CATALOG_DB.prepare(
       "INSERT INTO media_countries (media_type, tmdb_id, country_code) VALUES (?, ?, ?)",
     ).bind(mediaType, detail.id, countryCode));
+  }
+  if (trailerKey) {
+    statements.push(env.CATALOG_DB.prepare(
+      "INSERT INTO media_trailers (media_type, tmdb_id, youtube_key, updated_at) VALUES (?, ?, ?, ?)",
+    ).bind(mediaType, detail.id, trailerKey, updatedAt));
   }
   for (const person of cast) {
     statements.push(env.CATALOG_DB.prepare(
@@ -260,7 +319,7 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
 
 async function processMedia(env: SyncEnv, message: MediaMessage): Promise<void> {
   const detail = await tmdbFetch<TmdbDetail>(env, `/${message.mediaType}/${message.tmdbId}`, {
-    append_to_response: "credits",
+    append_to_response: "credits,videos",
   });
   await storeDetail(env, message.mediaType, detail);
 }
@@ -317,12 +376,13 @@ export default {
       .bind("cron", startedAt, "running").run();
     try {
       const countryBackfillCount = await runCountryBackfill(env);
+      const trailerBackfillCount = await runTrailerBackfill(env);
       // Complete the one-off local country index before spending Queue
       // operations on ongoing catalog discovery.
       const isDiscoverySlot = new Date().getUTCMinutes() === 5;
       const seededCount = countryBackfillCount > 0 || !isDiscoverySlot ? 0 : await enqueueSeeds(env, 25);
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, seeded_count = ?, completed_at = ? WHERE id = ?")
-        .bind("completed", countryBackfillCount + seededCount, now(), run.meta.last_row_id).run();
+        .bind("completed", countryBackfillCount + trailerBackfillCount + seededCount, now(), run.meta.last_row_id).run();
     } catch (error) {
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, error = ?, completed_at = ? WHERE id = ?")
         .bind("failed", error instanceof Error ? error.message : String(error), now(), run.meta.last_row_id).run();

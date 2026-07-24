@@ -219,12 +219,14 @@ export class CatalogClient {
     const media = await database.prepare(`SELECT ${mediaColumns} FROM media WHERE media_type = ? AND tmdb_id = ?`)
       .bind(mediaType, id).first<CatalogMediaRow>();
     if (!media) return null;
-    const [genresResult, castResult, similarResult] = await database.batch([
+    const [genresResult, castResult, similarResult, trailerResult] = await database.batch([
       database.prepare(`SELECT g.genre_id, g.name FROM genres g JOIN media_genres mg ON mg.genre_id = g.genre_id
         WHERE mg.media_type = ? AND mg.tmdb_id = ? ORDER BY g.name`).bind(mediaType, id),
       database.prepare("SELECT person_id, name, character_name, profile_path FROM media_cast WHERE media_type = ? AND tmdb_id = ? ORDER BY cast_order LIMIT 10")
         .bind(mediaType, id),
       database.prepare(`SELECT ${mediaColumns} FROM media WHERE media_type = ? AND tmdb_id != ? ORDER BY popularity DESC LIMIT 12`)
+        .bind(mediaType, id),
+      database.prepare("SELECT youtube_key FROM media_trailers WHERE media_type = ? AND tmdb_id = ?")
         .bind(mediaType, id),
     ]);
     const genres = (genresResult.results as CatalogGenreRow[]).map((genre) => ({ id: genre.genre_id, name: genre.name }));
@@ -244,6 +246,7 @@ export class CatalogClient {
       genres,
       cast,
       similar: await rowsWithGenres(similarRows, database),
+      trailerKey: (trailerResult.results[0] as { youtube_key?: string } | undefined)?.youtube_key ?? null,
     };
   }
 }

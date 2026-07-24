@@ -32,6 +32,7 @@ export interface MediaDetails extends MediaItem {
   genres: Genre[];
   cast: MediaCredit[];
   similar: MediaItem[];
+  trailerKey: string | null;
 }
 
 export interface PagedMedia {
