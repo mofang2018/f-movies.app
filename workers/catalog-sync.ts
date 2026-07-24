@@ -2,6 +2,8 @@ export interface SyncEnv {
   CATALOG_DB: D1Database;
   TMDB_IMAGES: R2Bucket;
   MEDIA_SYNC_QUEUE: Queue<SyncMessage>;
+  // Kept while previously queued image messages drain; new images are persisted
+  // directly by the media consumer to stay within the Queues free-tier quota.
   IMAGE_INGEST_QUEUE: Queue<ImageMessage>;
   TMDB_RATE_LIMITER: DurableObjectNamespace;
   TMDB_READ_ACCESS_TOKEN: string;
@@ -188,10 +190,14 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
   }
   await env.CATALOG_DB.batch(statements);
 
-  const imageMessages: ImageMessage[] = [];
-  if (detail.poster_path && isValidImagePath(detail.poster_path)) imageMessages.push({ kind: "image", imageType: "poster", path: detail.poster_path });
-  if (detail.backdrop_path && isValidImagePath(detail.backdrop_path)) imageMessages.push({ kind: "image", imageType: "backdrop", path: detail.backdrop_path });
-  if (imageMessages.length) await env.IMAGE_INGEST_QUEUE.sendBatch(imageMessages.map((body) => ({ body })));
+  // Do not enqueue every poster and backdrop as a separate Queue message.
+  // At catalog scale that quickly exhausts the Queues free-tier daily write quota.
+  // Two bounded image writes within the existing media message retain R2 caching
+  // while keeping the queue budget dedicated to catalog metadata.
+  const images: ImageMessage[] = [];
+  if (detail.poster_path && isValidImagePath(detail.poster_path)) images.push({ kind: "image", imageType: "poster", path: detail.poster_path });
+  if (detail.backdrop_path && isValidImagePath(detail.backdrop_path)) images.push({ kind: "image", imageType: "backdrop", path: detail.backdrop_path });
+  await Promise.all(images.map((image) => processImage(env, image)));
 }
 
 async function processMedia(env: SyncEnv, message: MediaMessage): Promise<void> {
@@ -252,7 +258,7 @@ export default {
     const run = await env.CATALOG_DB.prepare("INSERT INTO sync_runs (trigger, started_at, status) VALUES (?, ?, ?)")
       .bind("cron", startedAt, "running").run();
     try {
-      const seededCount = await enqueueSeeds(env, 100);
+      const seededCount = await enqueueSeeds(env, 25);
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, seeded_count = ?, completed_at = ? WHERE id = ?")
         .bind("completed", seededCount, now(), run.meta.last_row_id).run();
     } catch (error) {

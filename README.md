@@ -36,7 +36,7 @@ npx wrangler secret put SYNC_ADMIN_TOKEN --config wrangler.sync.jsonc
 npm run sync:deploy
 ```
 
-During the initial backfill, the Cron runs every 10 minutes and seeds at most 100 catalog entries per run. After the desired catalog size is reached, change the Cron back to an hourly schedule. The sync Worker intentionally has no public `workers.dev` route; expose a one-off seed endpoint only behind Cloudflare Access or a Service Binding when an operator console is added.
+During the initial backfill, the Cron runs every 15 minutes and seeds at most 25 catalog entries per run. Posters and backdrops are written directly to R2 by the media consumer, rather than creating additional Queue messages per image; this keeps Queue free-tier usage below its daily operation limit. After the desired catalog size is reached, change the Cron back to an hourly schedule. The sync Worker intentionally has no public `workers.dev` route; expose a one-off seed endpoint only behind Cloudflare Access or a Service Binding when an operator console is added.
 
 ## Checks
 
