@@ -27,6 +27,8 @@ export function mediaUrl(item: Pick<MediaItem, "mediaType" | "id" | "title">): s
 
 export function mediaIdFromSlug(value: string | undefined): number | null {
   if (!value) return null;
+  // A title is required. Pure ids were never public URLs for this site.
+  if (!value.includes("-")) return null;
   const match = value.match(/(?:^|-)(\d+)$/);
   if (!match) return null;
   const id = Number(match[1]);
