@@ -49,7 +49,7 @@ npm run build
 
 ## Cloudflare deployment
 
-Deploy the image proxy first, then attach `images.f-movies.app` as its custom domain in Cloudflare:
+Deploy the image proxy first, then attach `images.watchfmovies.org` as its custom domain in Cloudflare:
 
 ```bash
 npm run deploy:images
@@ -62,7 +62,7 @@ npx wrangler secret put TMDB_READ_ACCESS_TOKEN
 npm run deploy
 ```
 
-The production build sends poster and backdrop URLs to `https://images.f-movies.app`. Set `PUBLIC_IMAGE_CDN_URL` at build time to use a different Cloudflare image domain.
+The production build sends poster and backdrop URLs to `https://images.watchfmovies.org`. Set `PUBLIC_IMAGE_CDN_URL` at build time to use a different Cloudflare image domain.
 
 ## Scope
 

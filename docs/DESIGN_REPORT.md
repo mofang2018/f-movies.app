@@ -1,8 +1,8 @@
-# f-movies.app 网站设计报告
+# watchfmovies.org 网站设计报告
 
 ## 1. 项目目标
 
-`f-movies.app` 是一个基于 TMDB 数据的电影与剧集发现站。第一阶段提供首页推荐、分类浏览、关键词搜索和详情页，不提供真实视频播放、用户账户或收藏同步。
+`watchfmovies.org` 是一个基于 TMDB 数据的电影与剧集发现站。第一阶段提供首页推荐、分类浏览、关键词搜索和详情页，不提供真实视频播放、用户账户或收藏同步。
 
 视觉与信息架构参考 `ffmovies.tv`（`www.f-movies.org` 当前重定向到该站），但使用独立的 `F•MOVIES` 品牌、原创文案与组件实现。项目采用 `JCodesMore/ai-website-cloner-template` 的调研、规格、组件拆分和视觉验收流程，不照搬其 Next.js 运行时。
 
@@ -54,7 +54,7 @@
 
 所有组件只通过 `getImageUrl()` 生成图片地址：
 
-- 生产环境设置 `PUBLIC_IMAGE_CDN_URL=https://images.f-movies.app`。
+- 生产环境设置 `PUBLIC_IMAGE_CDN_URL=https://images.watchfmovies.org`。
 - 图片 Worker 接收 `/w500/<tmdb-path>`、`/w1280/<tmdb-path>` 等路径。
 - Worker 从 `image.tmdb.org/t/p/original` 获取源图，使用 Cloudflare Image Resizing 转换为 AVIF/WebP，并设置长期缓存。
 - 未配置 Cloudflare 图片域名的本地环境回退到 TMDB 官方图片 CDN，便于零配置开发。
@@ -110,7 +110,7 @@
 
 ## 10. 部署步骤
 
-1. 在 Cloudflare 创建 Worker 项目并绑定 `f-movies.app`。
+1. 在 Cloudflare 创建 Worker 项目并绑定 `watchfmovies.org` 与 `www.watchfmovies.org`，并将 `www` 永久重定向到裸域。
 2. 使用 `wrangler secret put TMDB_READ_ACCESS_TOKEN` 写入密钥。
 3. 设置 `PUBLIC_IMAGE_CDN_URL`，指向图片 Worker 自定义域名。
 4. 执行 `npm run deploy`；Cloudflare 自动构建并发布 Astro Worker。

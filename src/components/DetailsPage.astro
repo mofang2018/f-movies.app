@@ -1,5 +1,6 @@
 ---
 import { CalendarDays, Clock3, Play, Star, X } from "@lucide/astro";
+import { countryName } from "../lib/country";
 import { getImageUrl } from "../lib/images";
 import { mediaPath } from "../lib/media-url";
 import { genrePath } from "../lib/genre-url";
@@ -27,6 +28,8 @@ const trailerEmbedUrl = details.trailerKey
   : null;
 const parentPath = details.mediaType === "movie" ? "/movies" : "/tv-series";
 const parentLabel = details.mediaType === "movie" ? "Movies" : "TV Series";
+const directorNames = details.directors.map((director) => director.name);
+const countryNames = details.countries.map(countryName);
 const breadcrumbs = [
   { href: "/home", label: "Home" },
   { href: parentPath, label: parentLabel },
@@ -43,6 +46,8 @@ const structuredData = {
       ...(shareImage ? { image: shareImage } : {}),
       ...(details.releaseDate ? { datePublished: details.releaseDate } : {}),
       ...(details.genres.length ? { genre: details.genres.map((genre) => genre.name) } : {}),
+      ...(directorNames.length ? { director: directorNames.map((name) => ({ "@type": "Person", name })) } : {}),
+      ...(countryNames.length ? { countryOfOrigin: countryNames.map((name) => ({ "@type": "Country", name })) } : {}),
       ...(details.cast.length ? { actor: details.cast.map((person) => ({ "@type": "Person", name: person.name })) } : {}),
     },
     {
@@ -95,6 +100,22 @@ const structuredData = {
             )}
             {details.status && <span>Status: {details.status}</span>}
           </div>
+          {(directorNames.length > 0 || countryNames.length > 0) && (
+            <dl class="title-facts" aria-label={`${details.title} production details`}>
+              {directorNames.length > 0 && (
+                <div>
+                  <dt>Director{directorNames.length === 1 ? "" : "s"}</dt>
+                  <dd>{directorNames.join(", ")}</dd>
+                </div>
+              )}
+              {countryNames.length > 0 && (
+                <div>
+                  <dt>{countryNames.length === 1 ? "Country" : "Countries"}</dt>
+                  <dd>{countryNames.join(", ")}</dd>
+                </div>
+              )}
+            </dl>
+          )}
         </div>
       </div>
     </section>
@@ -136,7 +157,7 @@ const structuredData = {
           referrerpolicy="strict-origin-when-cross-origin"
         ></iframe>
       </div>
-      <p>Trailer provided by YouTube. FMOVIES does not host video files.</p>
+      <p>Trailer provided by YouTube.</p>
     </dialog>
   )}
 
@@ -300,6 +321,43 @@ const structuredData = {
     font-size: 12px;
   }
 
+  .title-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    max-width: 690px;
+    margin: 27px 0 0;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--radius);
+    background: rgba(11, 13, 17, 0.52);
+  }
+
+  .title-facts div {
+    min-width: 0;
+    padding: 14px 17px;
+    background: rgba(27, 30, 38, 0.72);
+  }
+
+  .title-facts dt {
+    color: var(--color-accent);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .title-facts dd {
+    margin: 5px 0 0;
+    overflow: hidden;
+    color: #f2f4f7;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .cast-section {
     padding-top: 50px;
   }
@@ -450,6 +508,10 @@ const structuredData = {
       -webkit-line-clamp: 4;
     }
 
+    .title-facts {
+      margin-top: 22px;
+    }
+
     .cast-list {
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 16px 10px;
@@ -461,6 +523,10 @@ const structuredData = {
   }
 
   @media (max-width: 440px) {
+    .title-facts {
+      grid-template-columns: 1fr;
+    }
+
     .cast-list {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }

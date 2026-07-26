@@ -5,7 +5,7 @@ const siteBase = "https://www.themoviedb.org";
 const outputPath = new URL("../src/data/tmdb-snapshot.json", import.meta.url);
 const requestHeaders = {
   Accept: "text/html,application/xhtml+xml",
-  "User-Agent": "f-movies.app catalog snapshot/1.0",
+  "User-Agent": "watchfmovies.org catalog snapshot/1.0",
 };
 
 const genreNames = new Map([

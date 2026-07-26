@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "f-movies-retired-domain",
+  "main": "workers/retired-domain.ts",
+  "compatibility_date": "2026-07-22",
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "f-movies.app/*", "zone_name": "f-movies.app" },
+    { "pattern": "www.f-movies.app/*", "zone_name": "f-movies.app" }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

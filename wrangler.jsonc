@@ -1,9 +1,14 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "f-movies-app",
+  "workers_dev": false,
   "main": "@astrojs/cloudflare/entrypoints/server",
   "compatibility_date": "2026-07-22",
   "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    { "pattern": "watchfmovies.org/*", "zone_name": "watchfmovies.org" },
+    { "pattern": "www.watchfmovies.org/*", "zone_name": "watchfmovies.org" }
+  ],
   "observability": {
     "enabled": true
   },
@@ -15,6 +20,6 @@
     }
   ],
   "vars": {
-    "PUBLIC_IMAGE_CDN_URL": "https://f-movies-images.ericfang2013.workers.dev"
+    "PUBLIC_IMAGE_CDN_URL": "https://images.watchfmovies.org"
   }
 }

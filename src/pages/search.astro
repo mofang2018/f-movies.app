@@ -1,5 +1,5 @@
 ---
-import EmptyState from "../components/EmptyState.astro";
+import { Search } from "@lucide/astro";
 import MediaGrid from "../components/MediaGrid.astro";
 import Pagination from "../components/Pagination.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
@@ -12,9 +12,10 @@ if (Astro.url.searchParams.get("page") === "1") {
 }
 const requestedPage = Number(Astro.url.searchParams.get("page") ?? 1);
 const page = Number.isFinite(requestedPage) ? Math.max(1, Math.min(500, Math.floor(requestedPage))) : 1;
-Astro.response.headers.set("Cache-Control", "public, s-maxage=86400");
+Astro.response.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=900");
 const client = new TmdbClient(getTmdbToken());
 const catalog = await client.search(query, page);
+const displayedQuery = catalog.correctedQuery ?? query;
 if (catalog.totalPages > 0 && page > catalog.totalPages) return Astro.rewrite("/404");
 const searchParams = new URLSearchParams(query ? { q: query } : {});
 if (catalog.page > 1) searchParams.set("page", String(catalog.page));
@@ -34,9 +35,9 @@ const searchPaginationPath = query ? `/search?${new URLSearchParams({ q: query }
   <header class="page-heading search-heading">
     <div class="container">
       <span class="section-kicker">Search the library</span>
-      <h1>{query ? `Results for “${query}”` : "Find a title"}</h1>
-      <p>{query ? `${catalog.totalResults.toLocaleString()} matching titles found.` : "Search movies and TV series by title."}</p>
-      <form action="/search" method="get">
+      <h1>{query ? catalog.correctedQuery ? `Closest results for “${displayedQuery}”` : `Results for “${query}”` : "Find a title"}</h1>
+      <p>{query ? catalog.correctedQuery ? `Showing close matches for “${query}” from the FMOVIES catalogue.` : `${catalog.totalResults.toLocaleString()} matching titles found.` : "Search movies and TV series by title."}</p>
+      <form class="search-form" action="/search" method="get">
         <label class="screen-reader-only" for="page-query">Search movies and TV series</label>
         <input id="page-query" type="search" name="q" value={query} placeholder="Movie or TV series title..." autofocus={!query} />
         <button class="button button-primary" type="submit">Search</button>
@@ -46,26 +47,46 @@ const searchPaginationPath = query ? `/search?${new URLSearchParams({ q: query }
   <div class="page-content container">
     {catalog.results.length > 0 ? (
       <>
+        {catalog.correctedQuery && <p class="search-note">Try searching for <strong>{displayedQuery}</strong> to refine these results.</p>}
         <MediaGrid items={catalog.results} priorityCount={6} />
         <Pagination page={catalog.page} totalPages={catalog.totalPages} pathname="/search" query={{ q: query }} />
       </>
-    ) : <EmptyState query={query} />}
+    ) : (
+      <section class="search-empty">
+        <Search size={42} stroke-width={1.5} />
+        <h2>{query ? "No matching titles" : "Start with a title"}</h2>
+        <p>{query ? `No titles in the FMOVIES catalogue match “${query}”. Check the spelling or try a shorter title.` : "Enter a movie or TV-series title in the search box above."}</p>
+      </section>
+    )}
   </div>
 </BaseLayout>
 
 <style>
-  .search-heading form {
-    display: flex;
-    width: min(100%, 650px);
-    gap: 9px;
-    margin-top: 24px;
+  .search-heading {
+    background: linear-gradient(135deg, var(--color-footer), #20262a);
   }
 
-  .search-heading input {
+  .search-heading .container {
+    max-width: 900px;
+  }
+
+  .search-heading p {
+    max-width: 650px;
+  }
+
+  .search-form {
+    display: flex;
+    width: min(100%, 720px);
+    gap: 10px;
+    margin-top: 26px;
+  }
+
+  .search-form input {
     min-width: 0;
+    min-height: 52px;
     flex: 1;
-    height: 44px;
-    padding: 0 15px;
+    height: 52px;
+    padding: 0 18px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     outline: 0;
@@ -73,7 +94,59 @@ const searchPaginationPath = query ? `/search?${new URLSearchParams({ q: query }
     color: #fff;
   }
 
-  .search-heading input:focus {
+  .search-form input:focus {
     border-color: var(--color-accent);
+  }
+
+  .search-form .button {
+    min-height: 52px;
+  }
+
+  .search-note {
+    margin: 0 0 28px;
+    color: var(--color-muted);
+  }
+
+  .search-note strong {
+    color: var(--color-accent);
+  }
+
+  .search-empty {
+    display: flex;
+    min-height: 330px;
+    align-items: center;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .search-empty > svg {
+    color: var(--color-accent);
+  }
+
+  .search-empty h2 {
+    margin: 18px 0 6px;
+    font-size: 28px;
+  }
+
+  .search-empty p {
+    max-width: 560px;
+    margin: 0;
+    color: var(--color-muted);
+  }
+
+  @media (max-width: 620px) {
+    .search-form {
+      flex-direction: column;
+    }
+
+    .search-form .button {
+      width: 100%;
+    }
+
+    .search-form input {
+      flex: 0 0 52px;
+      width: 100%;
+    }
   }
 </style>

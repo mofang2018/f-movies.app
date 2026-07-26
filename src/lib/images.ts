@@ -8,6 +8,6 @@ export function getImageUrl(path: string | null, size: ImageSize = "w500"): stri
   if (import.meta.env.DEV) return `${tmdbImageHost}/${size}${path}`;
 
   const configuredHost = import.meta.env.PUBLIC_IMAGE_CDN_URL?.replace(/\/$/, "");
-  const imageHost = configuredHost || "https://images.f-movies.app";
+  const imageHost = configuredHost || "https://images.watchfmovies.org";
   return `${imageHost}/${size}/${path.replace(/^\//, "")}`;
 }

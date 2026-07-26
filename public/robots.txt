@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://f-movies.app/sitemap.xml
+Sitemap: https://watchfmovies.org/sitemap.xml

@@ -13,12 +13,16 @@ const data = await client.getHome();
 ---
 
 <BaseLayout
-  title="Discover Movies & TV Series — Ratings, Cast & More | FMOVIES"
-  description="Discover trending movies and popular TV series with community ratings, cast details, story information and recommendations powered by TMDB on FMOVIES."
+  title="Watch FMovies — Trending Movies & TV Series | FMOVIES"
+  description="Watch FMovies to discover trending movies and popular TV series with community ratings, cast details, story information and TMDB-powered recommendations."
 >
   <Hero items={data.trending} />
   <ShareStrip />
   <div class="container home-sections">
+    <section class="home-intro" aria-labelledby="watch-fmovies-heading">
+      <h2 id="watch-fmovies-heading">Watch FMovies for your next movie or series</h2>
+      <p>Browse trending titles, compare ratings, explore cast details, and find recommendations for what to watch next.</p>
+    </section>
     <MediaSection title="Trending now" eyebrow="This week" items={data.trending.slice(0, 12)} href="/movies" />
     <MediaSection title="Popular movies" eyebrow="Big screen picks" items={data.movies.slice(0, 12)} href="/movies" />
     <MediaSection title="Popular TV series" eyebrow="Series to start" items={data.tv.slice(0, 12)} href="/tv-series" />
@@ -29,5 +33,21 @@ const data = await client.getHome();
 <style>
   .home-sections {
     padding-bottom: 8px;
+  }
+
+  .home-intro {
+    max-width: 780px;
+    padding-top: 48px;
+  }
+
+  .home-intro h2 {
+    margin: 0;
+    font-size: clamp(26px, 3vw, 36px);
+    line-height: 1.14;
+  }
+
+  .home-intro p {
+    margin: 14px 0 0;
+    color: var(--color-muted);
   }
 </style>

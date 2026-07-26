@@ -3,7 +3,7 @@ import SiteFooter from "../components/SiteFooter.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import "../styles/global.css";
 
-const googleAnalyticsId = "G-M5LYPZWPGF";
+const googleAnalyticsId = "G-TVWPDBM5S5";
 
 interface Props {
   title?: string;
@@ -42,7 +42,7 @@ const jsonLdData = structuredData ?? {
 const jsonLd = JSON.stringify(jsonLdData).replace(/</g, "\\u003c");
 Astro.response.headers.set(
   "Content-Security-Policy",
-  "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; img-src 'self' data: https://images.f-movies.app https://f-movies-images.ericfang2013.workers.dev https://image.tmdb.org https://www.google-analytics.com; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com; frame-src https://www.youtube-nocookie.com",
+  "default-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; img-src 'self' data: https://images.watchfmovies.org https://image.tmdb.org https://www.google-analytics.com; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com; frame-src https://www.youtube-nocookie.com",
 );
 ---
 

@@ -3,40 +3,88 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
 Astro.response.headers.set("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
 
-const structuredData = {
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  name: "FMOVIES",
-  alternateName: "fmovies",
-  url: Astro.site?.href,
-  potentialAction: {
-    "@type": "SearchAction",
-    target: `${Astro.site?.href ?? "https://f-movies.app"}search?q={search_term_string}`,
-    "query-input": "required name=search_term_string",
+const faqItems = [
+  {
+    question: "What is FMovies?",
+    answer: "FMovies is a movie and TV-series discovery catalogue. Browse titles, ratings, cast information, genres, countries, and recommendations when you are choosing what to watch next.",
   },
-};
+  {
+    question: "How do I search FMovies by title?",
+    answer: "Use the search box to enter a movie or TV-series title. FMovies shows matching catalogue entries so you can open a title page and explore its synopsis, rating, cast, and related recommendations.",
+  },
+  {
+    question: "How can I browse Watch FMovies without searching?",
+    answer: "Start with Movies, TV Series, Top IMDb, a genre, or a country. These paths make it easy to move from a broad idea to specific titles and discover something that matches your mood.",
+  },
+  {
+    question: "Does FMovies require an account?",
+    answer: "No account is needed to explore the FMovies catalogue. You can search titles, browse collections, and open movie or TV-series pages directly in your browser.",
+  },
+  {
+    question: "Can I use Watch FMovies on mobile devices?",
+    answer: "Yes. Watch FMovies is designed to work across phones, tablets, and desktop browsers, with responsive navigation and search for discovering titles on any screen size.",
+  },
+  {
+    question: "How are FMovies genres and country pages organised?",
+    answer: "Genre and country pages group titles by their metadata, helping you explore categories such as action, comedy, horror, science fiction, or productions connected to a selected country.",
+  },
+  {
+    question: "How often is the Watch FMovies catalogue updated?",
+    answer: "Watch FMovies refreshes its catalogue with current movie and TV-series metadata as new information becomes available, including titles, ratings, cast details, and release information.",
+  },
+  {
+    question: "Where does FMovies get movie and TV-series information?",
+    answer: "FMovies uses TMDB metadata to present movie and TV-series details, including title summaries, cast information, release dates, ratings, and images.",
+  },
+];
+
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "FMOVIES",
+    alternateName: "fmovies",
+    url: Astro.site?.href,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${Astro.site?.href ?? "https://watchfmovies.org"}search?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqItems.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  },
+];
 ---
 
 <BaseLayout
-  title="fmovies — Discover Free Movies & TV Series | FMOVIES"
-  description="Explore fmovies to search movie and TV-series information, browse genres, countries, ratings and cast details, and discover free movies worth exploring."
+  title="Watch FMovies — Discover Movies & TV Series | FMOVIES"
+  description="Watch FMovies to search movie and TV-series information, browse genres, countries, ratings and cast details, and discover your next title."
   structuredData={structuredData}
 >
   <section class="landing-hero">
     <div class="landing-orb landing-orb-one"></div>
     <div class="landing-orb landing-orb-two"></div>
     <div class="landing-hero-content container">
-      <span class="landing-kicker">FMOVIES discovery guide</span>
-      <h1>fmovies: discover free movies and TV series</h1>
-      <p>Looking for free movies to explore? Search titles, browse popular genres and countries, and build your next watchlist with fmovies.</p>
+      <span class="landing-kicker">Movie discovery guide</span>
+      <h1>Watch FMovies: discover movies and TV series</h1>
+      <p>Watch FMovies to search titles, browse popular genres and countries, and build your next watchlist with movie and TV-series details in one place.</p>
       <form class="landing-search" action="/search" method="get">
-        <label class="screen-reader-only" for="landing-query">Search fmovies</label>
+        <label class="screen-reader-only" for="landing-query">Search titles</label>
         <input id="landing-query" type="search" name="q" placeholder="Search movies and TV series" autocomplete="off" />
-        <button class="button button-primary" type="submit">Search fmovies</button>
+        <button class="button button-primary" type="submit">Search</button>
       </form>
       <div class="landing-actions">
-        <a class="button button-primary" href="/home">Explore movies</a>
-        <a class="button button-secondary" href="/tv-series">Browse TV series</a>
+        <a class="button button-secondary" href="/home">Go to home page</a>
       </div>
     </div>
   </section>
@@ -45,9 +93,9 @@ const structuredData = {
     <section class="intro-grid" aria-labelledby="what-is-fmovies">
       <div>
         <span class="section-kicker">A simpler starting point</span>
-        <h2 id="what-is-fmovies">What is fmovies?</h2>
+        <h2 id="what-is-fmovies">What is this catalogue?</h2>
       </div>
-      <p>FMOVIES is a fast catalogue for discovering movie and TV-series details. Use it to search titles, compare ratings, browse cast information, or follow a genre when you are deciding what to watch next.</p>
+      <p>FMOVIES is a fast catalogue for discovering movie and TV-series details. When you watch FMovies for your next pick, use it to search titles, compare ratings, browse cast information, or follow a genre before deciding what to watch next.</p>
     </section>
 
     <section class="discovery-cards" aria-label="Browse fmovies">
@@ -72,7 +120,7 @@ const structuredData = {
       <div>
         <span class="section-kicker">Find your next title</span>
         <h2 id="browse-fmovies">Browse fmovies your way</h2>
-        <p>Move from a broad search to a specific movie or TV-series page in a few clicks. The catalogue is organised around the ways people naturally look for free movies: title, genre, country, popularity, and rating.</p>
+        <p>Move from a broad search to a specific movie or TV-series page in a few clicks. Watch FMovies by title, genre, country, popularity, or rating to find details for your next pick.</p>
       </div>
       <nav aria-label="Featured discovery links">
         <a href="/genre/action">Action movies</a>
@@ -86,19 +134,13 @@ const structuredData = {
 
     <section class="landing-faq" aria-labelledby="fmovies-faq">
       <span class="section-kicker">FMOVIES FAQ</span>
-      <h2 id="fmovies-faq">Find more with fmovies</h2>
-      <details>
-        <summary>Can I search fmovies by title?</summary>
-        <p>Yes. Use the search box to find matching movies and TV series, then open a title page for its synopsis, rating, cast, and recommendations.</p>
-      </details>
-      <details>
-        <summary>How can I browse free movies to discover?</summary>
-        <p>Start with Movies, TV-Series, Top IMDb, a genre, or a country. These pages make it easier to narrow a broad free-movies search into titles that interest you.</p>
-      </details>
-      <details>
-        <summary>Where does the catalogue information come from?</summary>
-        <p>FMOVIES uses TMDB metadata for movie and TV-series information. FMOVIES does not host or stream video files.</p>
-      </details>
+      <h2 id="fmovies-faq">Watch FMovies: frequently asked questions</h2>
+      {faqItems.map((item) => (
+        <details>
+          <summary>{item.question}</summary>
+          <p>{item.answer}</p>
+        </details>
+      ))}
     </section>
   </div>
 </BaseLayout>
@@ -140,8 +182,13 @@ const structuredData = {
   }
 
   .landing-hero-content {
+    display: flex;
     max-width: calc(var(--content-width) - 140px);
+    align-items: center;
+    flex-direction: column;
     margin-left: max(24px, calc((100vw - var(--content-width)) / 2));
+    margin-right: max(24px, calc((100vw - var(--content-width)) / 2));
+    text-align: center;
   }
 
   .landing-kicker {
@@ -164,23 +211,23 @@ const structuredData = {
 
   .landing-hero p {
     max-width: 650px;
-    margin: 22px 0 0;
+    margin: 22px auto 0;
     color: #d1d6d5;
     font-size: clamp(17px, 2vw, 20px);
   }
 
   .landing-search {
     display: flex;
-    width: min(100%, 650px);
-    gap: 9px;
-    margin-top: 32px;
+    width: min(100%, 680px);
+    gap: 8px;
+    margin: 32px auto 0;
   }
 
   .landing-search input {
     min-width: 0;
     flex: 1;
-    height: 46px;
-    padding: 0 16px;
+    height: 56px;
+    padding: 0 20px;
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: var(--radius);
     outline: 0;
@@ -190,6 +237,11 @@ const structuredData = {
 
   .landing-search input:focus {
     border-color: var(--color-accent);
+  }
+
+  .landing-search .button {
+    min-height: 56px;
+    flex: 0 0 auto;
   }
 
   .landing-actions {
@@ -334,11 +386,13 @@ const structuredData = {
     }
 
     .landing-search {
-      flex-direction: column;
+      width: 100%;
+      gap: 6px;
     }
 
     .landing-search .button {
-      width: 100%;
+      min-height: 54px;
+      padding-inline: 16px;
     }
 
     .landing-content {

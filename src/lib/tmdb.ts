@@ -36,7 +36,14 @@ interface TmdbMediaRaw {
       character?: string;
       profile_path?: string | null;
     }>;
+    crew?: Array<{
+      id: number;
+      name: string;
+      job?: string;
+    }>;
   };
+  production_countries?: Array<{ iso_3166_1?: string }>;
+  origin_country?: string[];
   similar?: TmdbPagedRaw;
   videos?: { results?: Array<{ site?: string; key?: string; type?: string; official?: boolean }> };
 }
@@ -229,19 +236,9 @@ export class TmdbClient {
       const catalog = await this.catalog.search(query, page);
       if (catalog) return catalog;
     } catch {
-      // Continue with the existing TMDB and JSON fallbacks.
+      // Search results must come from the local catalogue only.
     }
-    if (!this.token) {
-      const all = [...fallbackHome.movies, ...fallbackHome.tv];
-      const results = all.filter((item) => item.title.toLowerCase().includes(query.toLowerCase()));
-      return { page: 1, totalPages: 1, totalResults: results.length, results };
-    }
-    try {
-      const raw = await this.request<TmdbPagedRaw>("/search/multi", { query, page, include_adult: "false" }, 300);
-      return normalizePage(raw, "movie");
-    } catch {
-      return { page: 1, totalPages: 0, totalResults: 0, results: [] };
-    }
+    return { page: 1, totalPages: 0, totalResults: 0, results: [] };
   }
 
   async getDetails(mediaType: MediaType, id: number): Promise<MediaDetails> {
@@ -264,6 +261,13 @@ export class TmdbClient {
         seasons: raw.number_of_seasons ?? null,
         status: raw.status ?? "",
         genres: raw.genres ?? [],
+        directors: (raw.credits?.crew ?? [])
+          .filter((person) => person.job === "Director")
+          .map((person) => ({ id: person.id, name: person.name })),
+        countries: [...new Set([
+          ...(raw.production_countries ?? []).map((country) => country.iso_3166_1),
+          ...(raw.origin_country ?? []),
+        ].filter((code): code is string => /^[A-Z]{2}$/.test(code ?? "")))],
         cast: (raw.credits?.cast ?? []).slice(0, 10).map((person) => ({
           id: person.id,
           name: person.name,

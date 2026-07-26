@@ -24,12 +24,19 @@ export interface MediaCredit {
   profilePath: string | null;
 }
 
+export interface MediaPerson {
+  id: number;
+  name: string;
+}
+
 export interface MediaDetails extends MediaItem {
   tagline: string;
   runtime: number | null;
   seasons: number | null;
   status: string;
   genres: Genre[];
+  directors: MediaPerson[];
+  countries: string[];
   cast: MediaCredit[];
   similar: MediaItem[];
   trailerKey: string | null;
@@ -40,6 +47,7 @@ export interface PagedMedia {
   totalPages: number;
   totalResults: number;
   results: MediaItem[];
+  correctedQuery?: string;
 }
 
 export interface HomeData {

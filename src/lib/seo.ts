@@ -1,7 +1,7 @@
 import { mediaPath } from "./media-url";
 import type { MediaType } from "../types/media";
 
-export const siteOrigin = "https://f-movies.app";
+export const siteOrigin = "https://watchfmovies.org";
 export const sitemapShardSize = 1_000;
 // After the initial catalogue import, metadata changes are deliberately
 // infrequent. A 24-hour edge TTL keeps D1 reads and Worker work low while

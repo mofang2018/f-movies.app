@@ -2,20 +2,20 @@
 
 审计时间：2026-07-24
 
-审计入口：本地 SSR `http://127.0.0.1:4321/`
+审计入口：`https://watchfmovies.org/`
 
-首选域名：`https://f-movies.app`
+首选域名：`https://watchfmovies.org`
 
-本报告按 [onpage-seo-audit](https://github.com/linhan-dev/onpage-seo-audit) 的规则完成。审阅了落地页、内容首页、电影/剧集/榜单页、类型页、国家页、搜索页、详情页、分页与无效 URL；同时抓取本地 SSR 的 `robots.txt` 和 sitemap。正式域名当前无法 DNS 解析，因此线上验证留待上线后执行。
+本报告按 [onpage-seo-audit](https://github.com/linhan-dev/onpage-seo-audit) 的规则完成。审阅了落地页、内容首页、电影/剧集/榜单页、类型页、国家页、搜索页、详情页、分页与无效 URL；同时验证了生产域名的 `robots.txt`、sitemap、HTTPS 和规范域重定向。
 
 ## 汇总
 
-- 待处理：1 类（域名解析，按当前要求暂缓）
-- 本轮已修复：6 类
+- 待处理：0 类
+- 已修复：7 类
 
 ## 修复优先级
 
-1. 上线时让 `f-movies.app` 可解析并复查真实的 HTTP、DNS 与抓取行为。
+1. 上线后持续监控搜索引擎抓取、Cloudflare Workers 错误率和 Core Web Vitals。
 
 ## 已验证的基础项
 
@@ -27,6 +27,8 @@
 - 默认 Open Graph/Twitter 分享图已替换为 1200×630 PNG；详情页使用媒体类型 Open Graph 标签。
 - 空国家页现在输出 `noindex,follow`；类型、国家和详情页均有可见面包屑及一致的 JSON-LD。
 - 全站 HTML 响应设置 CSP；搜索、DMCA 和 404 的标题及描述已扩展。
+- `watchfmovies.org` 通过 Cloudflare DNS、有效 TLS 和 Worker 路由返回 `200`；`www.watchfmovies.org` 以 `301` 重定向至裸域，生产 `robots.txt` 与 sitemap 均可访问。
+- 已放弃的 `f-movies.app` 不应重定向到新域，以免将历史垃圾外链信号传递给 `watchfmovies.org`；旧域应稳定返回 `410 Gone` 并携带 `X-Robots-Tag: noindex, nofollow`。
 
 ## 低优先级提示
 

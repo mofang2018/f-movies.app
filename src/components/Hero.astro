@@ -1,5 +1,5 @@
 ---
-import { CalendarDays, Info, Play, Star } from "@lucide/astro";
+import { CalendarDays, Play, Star } from "@lucide/astro";
 import { getImageUrl } from "../lib/images";
 import { mediaUrl } from "../lib/media-url";
 import type { MediaItem } from "../types/media";
@@ -27,7 +27,7 @@ const slides = items.length > 0 ? items : Astro.props.items.slice(0, 1);
       <div class="hero-overlay" aria-hidden="true"></div>
       <div class="hero-content container">
         <span class="hero-kicker">Featured {item.mediaType === "movie" ? "Movie" : "Series"}</span>
-        {index === 0 && <h1 class="hero-page-title">Discover movies and TV series</h1>}
+        {index === 0 && <h1 class="hero-page-title">Watch FMovies: discover movies and TV series</h1>}
         <h2 class="hero-title">{item.title}</h2>
         <div class="hero-meta">
           <strong>HD</strong>
@@ -37,8 +37,7 @@ const slides = items.length > 0 ? items : Astro.props.items.slice(0, 1);
         </div>
         <p>{item.overview || "Discover this title, its cast, details and similar recommendations."}</p>
         <div class="hero-actions">
-          <a class="button button-primary" href={mediaUrl(item)}><Play size={18} fill="currentColor" /> Explore title</a>
-          <a class="button button-secondary" href={mediaUrl(item)}><Info size={18} /> More info</a>
+          <a class="button button-primary" href={mediaUrl(item)}><Play size={18} fill="currentColor" /> Watch</a>
         </div>
       </div>
     </article>
