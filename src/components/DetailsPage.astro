@@ -30,6 +30,7 @@ const parentPath = details.mediaType === "movie" ? "/movies" : "/tv-series";
 const parentLabel = details.mediaType === "movie" ? "Movies" : "TV Series";
 const directorNames = details.directors.map((director) => director.name);
 const countryNames = details.countries.map(countryName);
+const personPlaceholder = "/images/person-placeholder.svg";
 const breadcrumbs = [
   { href: "/home", label: "Home" },
   { href: parentPath, label: parentLabel },
@@ -129,7 +130,14 @@ const structuredData = {
         <div class="cast-list">
           {details.cast.map((person) => (
             <article class="cast-person">
-              <img src={getImageUrl(person.profilePath, "w185")} alt={person.name} width="185" height="278" loading="lazy" />
+              <img
+                src={person.profilePath ? getImageUrl(person.profilePath, "w185") : personPlaceholder}
+                alt={person.name}
+                width="185"
+                height="278"
+                loading="lazy"
+                onerror={`this.onerror=null;this.src='${personPlaceholder}'`}
+              />
               <h3>{person.name}</h3>
               <p>{person.character || "Cast"}</p>
             </article>

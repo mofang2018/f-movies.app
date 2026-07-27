@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" role="img" aria-labelledby="title">
+  <title id="title">Portrait unavailable</title>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#303842"/>
+      <stop offset="1" stop-color="#20252d"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#background)"/>
+  <circle cx="200" cy="207" r="78" fill="#697586"/>
+  <path d="M57 538c12-116 73-181 143-181s131 65 143 181" fill="#697586"/>
+  <path d="M143 205c0-31 25-56 57-56s57 25 57 56-25 56-57 56-57-25-57-56Z" fill="#aab4c1"/>
+  <path d="M115 449c25-38 51-56 85-56s60 18 85 56" fill="#aab4c1"/>
+</svg>
