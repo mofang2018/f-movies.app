@@ -276,15 +276,24 @@ function directorsFor(detail: TmdbDetail): Array<{ id: number; name: string }> {
   });
 }
 
-/** One-time, daily director enrichment for the existing local catalogue. */
-async function runDirectorBackfill(env: SyncEnv, limit = 100): Promise<number> {
+/**
+ * One-time movie-director enrichment. TV series are intentionally excluded:
+ * they usually have creators/showrunners rather than one reliable director.
+ * Every examined movie receives a check record, including titles for which
+ * TMDB has no director credit, so this job is finite and never re-fetches a
+ * verified absence.
+ */
+async function runDirectorBackfill(env: SyncEnv, limit = 500): Promise<number> {
   const job = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
     .bind("director-backfill-cursor").first<{ state: string }>();
   if (!job || job.state === "done") return 0;
 
-  const cursor = Math.max(0, Number(job.state) || 0);
-  const rows = await env.CATALOG_DB.prepare(`SELECT rowid, media_type, tmdb_id FROM media
-    WHERE rowid > ? ORDER BY rowid LIMIT ?`).bind(cursor, limit).all<{ rowid: number; media_type: MediaType; tmdb_id: number }>();
+  const rows = await env.CATALOG_DB.prepare(`SELECT m.media_type, m.tmdb_id FROM media m
+    LEFT JOIN media_director_checks checked
+      ON checked.media_type = m.media_type AND checked.tmdb_id = m.tmdb_id
+    WHERE m.media_type = 'movie' AND checked.tmdb_id IS NULL
+    ORDER BY m.popularity DESC, m.tmdb_id DESC
+    LIMIT ?`).bind(limit).all<{ media_type: MediaType; tmdb_id: number }>();
   for (const row of rows.results) {
     try {
       const detail = await tmdbFetch<TmdbDetail>(env, `/${row.media_type}/${row.tmdb_id}`, { append_to_response: "credits" });
@@ -295,12 +304,20 @@ async function runDirectorBackfill(env: SyncEnv, limit = 100): Promise<number> {
         statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_directors (media_type, tmdb_id, person_id, name, director_order)
           VALUES (?, ?, ?, ?, ?)`).bind(row.media_type, row.tmdb_id, director.id, director.name, index));
       }
+      statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_director_checks (media_type, tmdb_id, checked_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(media_type, tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`)
+        .bind(row.media_type, row.tmdb_id, now()));
       await env.CATALOG_DB.batch(statements);
     } catch (error) {
       if (!isTmdbNotFound(error)) throw error;
+      await env.CATALOG_DB.prepare(`INSERT INTO media_director_checks (media_type, tmdb_id, checked_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(media_type, tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`)
+        .bind(row.media_type, row.tmdb_id, now()).run();
     }
   }
-  const nextState = rows.results.length < limit ? "done" : String(rows.results.at(-1)?.rowid ?? cursor);
+  const nextState = rows.results.length < limit ? "done" : "running";
   await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = ?, updated_at = ? WHERE job_key = ?")
     .bind(nextState, now(), "director-backfill-cursor").run();
   return rows.results.length;
@@ -382,6 +399,12 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
       "INSERT INTO media_directors (media_type, tmdb_id, person_id, name, director_order) VALUES (?, ?, ?, ?, ?)",
     ).bind(mediaType, detail.id, director.id, director.name, index));
   }
+  if (mediaType === "movie") {
+    statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_director_checks (media_type, tmdb_id, checked_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(media_type, tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`)
+      .bind(mediaType, detail.id, updatedAt));
+  }
   await env.CATALOG_DB.batch(statements);
 
   // Do not enqueue every poster and backdrop as a separate Queue message.
@@ -452,9 +475,11 @@ export default {
     const run = await env.CATALOG_DB.prepare("INSERT INTO sync_runs (trigger, started_at, status) VALUES (?, ?, ?)")
       .bind("cron", startedAt, "running").run();
     try {
-      const countryBackfillCount = await runCountryBackfill(env);
-      const trailerBackfillCount = await runTrailerBackfill(env);
       const directorBackfillCount = await runDirectorBackfill(env);
+      const countryBackfillCount = await runCountryBackfill(env);
+      // Director enrichment temporarily receives the full rate-limited budget.
+      // Resume the lower-priority trailer backfill automatically when finished.
+      const trailerBackfillCount = directorBackfillCount === 0 ? await runTrailerBackfill(env) : 0;
       // During the one-time import, advance the discovery cursor on every
       // scheduled run. Later refreshes are deliberately reduced to daily.
       const timestamp = new Date();
