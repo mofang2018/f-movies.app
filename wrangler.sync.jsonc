@@ -5,7 +5,7 @@
   "compatibility_date": "2026-07-22",
   "workers_dev": false,
   "observability": { "enabled": true },
-  "triggers": { "crons": ["5 0,12 * * *"] },
+  "triggers": { "crons": ["20 6,18 * * *"] },
   "d1_databases": [
     {
       "binding": "CATALOG_DB",

@@ -45,7 +45,7 @@ export function fallbackCountryPage(page = 1): PagedMedia {
 
 export function fallbackDetails(mediaType: MediaType, id: number): MediaDetails {
   const exact = snapshot.details.find((item) => item.id === id && item.mediaType === mediaType);
-  if (exact) return { ...exact, directors: exact.directors ?? [], countries: exact.countries ?? [], trailerKey: exact.trailerKey ?? null };
+  if (exact) return { ...exact, directors: exact.directors ?? [], writers: exact.writers ?? [], creators: exact.creators ?? [], countries: exact.countries ?? [], trailerKey: exact.trailerKey ?? null };
 
   const source = mediaType === "movie" ? snapshot.movies[0] : snapshot.tv[0];
   return {
@@ -56,6 +56,8 @@ export function fallbackDetails(mediaType: MediaType, id: number): MediaDetails 
     status: "",
     genres: fallbackGenres.filter((genre) => source.genreIds.includes(genre.id)),
     directors: [],
+    writers: [],
+    creators: [],
     countries: [],
     cast: [],
     similar: (mediaType === "movie" ? snapshot.movies : snapshot.tv)

@@ -29,6 +29,7 @@ interface TmdbMediaRaw {
   runtime?: number | null;
   number_of_seasons?: number | null;
   status?: string;
+  created_by?: Array<{ id: number; name: string }>;
   credits?: {
     cast?: Array<{
       id: number;
@@ -264,6 +265,11 @@ export class TmdbClient {
         directors: (raw.credits?.crew ?? [])
           .filter((person) => person.job === "Director")
           .map((person) => ({ id: person.id, name: person.name })),
+        writers: (raw.credits?.crew ?? [])
+          .filter((person) => person.job === "Writer" || person.job === "Screenplay")
+          .filter((person, index, people) => people.findIndex((candidate) => candidate.id === person.id) === index)
+          .map((person) => ({ id: person.id, name: person.name })),
+        creators: (raw.created_by ?? []).map((person) => ({ id: person.id, name: person.name })),
         countries: [...new Set([
           ...(raw.production_countries ?? []).map((country) => country.iso_3166_1),
           ...(raw.origin_country ?? []),

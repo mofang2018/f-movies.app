@@ -63,6 +63,10 @@ interface TmdbDetail {
   runtime?: number | null;
   number_of_seasons?: number | null;
   status?: string;
+  created_by?: Array<{
+    id: number;
+    name: string;
+  }>;
   genres?: TmdbGenre[];
   production_countries?: TmdbCountry[];
   origin_country?: string[];
@@ -276,50 +280,102 @@ function directorsFor(detail: TmdbDetail): Array<{ id: number; name: string }> {
   });
 }
 
+function writersFor(detail: TmdbDetail): Array<{ id: number; name: string; role: "Writer" | "Screenplay" }> {
+  const seen = new Set<number>();
+  return (detail.credits?.crew ?? []).flatMap((person) => {
+    const role = person.job === "Screenplay" ? "Screenplay" : person.job === "Writer" ? "Writer" : null;
+    if (!role || seen.has(person.id)) return [];
+    seen.add(person.id);
+    return [{ id: person.id, name: person.name, role }];
+  });
+}
+
+function creatorsFor(detail: TmdbDetail): Array<{ id: number; name: string }> {
+  const seen = new Set<number>();
+  return (detail.created_by ?? []).flatMap((person) => {
+    if (seen.has(person.id)) return [];
+    seen.add(person.id);
+    return [{ id: person.id, name: person.name }];
+  });
+}
+
 /**
- * One-time movie-director enrichment. TV series are intentionally excluded:
- * they usually have creators/showrunners rather than one reliable director.
- * Every examined movie receives a check record, including titles for which
- * TMDB has no director credit, so this job is finite and never re-fetches a
- * verified absence.
+ * One-time movie crew enrichment. Director, Writer and Screenplay credits are
+ * all returned from one `credits` request, so writers add no API cost.
  */
-async function runDirectorBackfill(env: SyncEnv, limit = 500): Promise<number> {
+async function runMovieCrewBackfill(env: SyncEnv, limit = 500): Promise<number> {
   const job = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
-    .bind("director-backfill-cursor").first<{ state: string }>();
+    .bind("movie-crew-backfill").first<{ state: string }>();
   if (!job || job.state === "done") return 0;
 
-  const rows = await env.CATALOG_DB.prepare(`SELECT m.media_type, m.tmdb_id FROM media m
-    LEFT JOIN media_director_checks checked
-      ON checked.media_type = m.media_type AND checked.tmdb_id = m.tmdb_id
+  const rows = await env.CATALOG_DB.prepare(`SELECT m.tmdb_id FROM media m
+    LEFT JOIN media_movie_crew_checks checked ON checked.tmdb_id = m.tmdb_id
     WHERE m.media_type = 'movie' AND checked.tmdb_id IS NULL
     ORDER BY m.popularity DESC, m.tmdb_id DESC
-    LIMIT ?`).bind(limit).all<{ media_type: MediaType; tmdb_id: number }>();
+    LIMIT ?`).bind(limit).all<{ tmdb_id: number }>();
   for (const row of rows.results) {
     try {
-      const detail = await tmdbFetch<TmdbDetail>(env, `/${row.media_type}/${row.tmdb_id}`, { append_to_response: "credits" });
+      const detail = await tmdbFetch<TmdbDetail>(env, `/movie/${row.tmdb_id}`, { append_to_response: "credits" });
       const statements: D1PreparedStatement[] = [
-        env.CATALOG_DB.prepare("DELETE FROM media_directors WHERE media_type = ? AND tmdb_id = ?").bind(row.media_type, row.tmdb_id),
+        env.CATALOG_DB.prepare("DELETE FROM media_directors WHERE media_type = 'movie' AND tmdb_id = ?").bind(row.tmdb_id),
+        env.CATALOG_DB.prepare("DELETE FROM media_writers WHERE media_type = 'movie' AND tmdb_id = ?").bind(row.tmdb_id),
       ];
       for (const [index, director] of directorsFor(detail).entries()) {
         statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_directors (media_type, tmdb_id, person_id, name, director_order)
-          VALUES (?, ?, ?, ?, ?)`).bind(row.media_type, row.tmdb_id, director.id, director.name, index));
+          VALUES ('movie', ?, ?, ?, ?)`).bind(row.tmdb_id, director.id, director.name, index));
       }
-      statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_director_checks (media_type, tmdb_id, checked_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(media_type, tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`)
-        .bind(row.media_type, row.tmdb_id, now()));
+      for (const [index, writer] of writersFor(detail).entries()) {
+        statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_writers (media_type, tmdb_id, person_id, name, credit_role, writer_order)
+          VALUES ('movie', ?, ?, ?, ?, ?)`).bind(row.tmdb_id, writer.id, writer.name, writer.role, index));
+      }
+      statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_movie_crew_checks (tmdb_id, checked_at)
+        VALUES (?, ?) ON CONFLICT(tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`).bind(row.tmdb_id, now()));
       await env.CATALOG_DB.batch(statements);
     } catch (error) {
       if (!isTmdbNotFound(error)) throw error;
-      await env.CATALOG_DB.prepare(`INSERT INTO media_director_checks (media_type, tmdb_id, checked_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(media_type, tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`)
-        .bind(row.media_type, row.tmdb_id, now()).run();
+      await env.CATALOG_DB.prepare(`INSERT INTO media_movie_crew_checks (tmdb_id, checked_at)
+        VALUES (?, ?) ON CONFLICT(tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`).bind(row.tmdb_id, now()).run();
     }
   }
   const nextState = rows.results.length < limit ? "done" : "running";
   await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = ?, updated_at = ? WHERE job_key = ?")
-    .bind(nextState, now(), "director-backfill-cursor").run();
+    .bind(nextState, now(), "movie-crew-backfill").run();
+  return rows.results.length;
+}
+
+/** TV uses creators rather than a potentially misleading single director. */
+async function runCreatorBackfill(env: SyncEnv, limit = 500): Promise<number> {
+  const job = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
+    .bind("creator-backfill").first<{ state: string }>();
+  if (!job || job.state === "done") return 0;
+
+  const rows = await env.CATALOG_DB.prepare(`SELECT m.tmdb_id FROM media m
+    LEFT JOIN media_creator_checks checked ON checked.tmdb_id = m.tmdb_id
+    WHERE m.media_type = 'tv' AND checked.tmdb_id IS NULL
+    ORDER BY m.popularity DESC, m.tmdb_id DESC
+    LIMIT ?`).bind(limit).all<{ tmdb_id: number }>();
+  for (const row of rows.results) {
+    try {
+      const detail = await tmdbFetch<TmdbDetail>(env, `/tv/${row.tmdb_id}`);
+      const statements: D1PreparedStatement[] = [
+        env.CATALOG_DB.prepare("DELETE FROM media_creators WHERE media_type = 'tv' AND tmdb_id = ?").bind(row.tmdb_id),
+      ];
+      for (const [index, creator] of creatorsFor(detail).entries()) {
+        statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_creators (media_type, tmdb_id, person_id, name, creator_order)
+          VALUES ('tv', ?, ?, ?, ?)`).bind(row.tmdb_id, creator.id, creator.name, index));
+      }
+      statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_creator_checks (tmdb_id, checked_at)
+        VALUES (?, ?) ON CONFLICT(tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`).bind(row.tmdb_id, now()));
+      await env.CATALOG_DB.batch(statements);
+    } catch (error) {
+      if (!isTmdbNotFound(error)) throw error;
+      await env.CATALOG_DB.prepare(`INSERT INTO media_creator_checks (tmdb_id, checked_at)
+        VALUES (?, ?) ON CONFLICT(tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`).bind(row.tmdb_id, now()).run();
+    }
+  }
+  const nextState = rows.results.length < limit ? "done" : "running";
+  await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = ?, updated_at = ? WHERE job_key = ?")
+    .bind(nextState, now(), "creator-backfill").run();
   return rows.results.length;
 }
 
@@ -349,6 +405,8 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
   const trailerKey = trailerKeyFor(detail);
   const cast = (detail.credits?.cast ?? []).slice(0, 10);
   const directors = directorsFor(detail);
+  const writers = writersFor(detail);
+  const creators = creatorsFor(detail);
   const statements: D1PreparedStatement[] = [
     env.CATALOG_DB.prepare(`INSERT INTO media (
       media_type, tmdb_id, title, original_title, overview, release_date, vote_average, vote_count,
@@ -368,6 +426,8 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
     env.CATALOG_DB.prepare("DELETE FROM media_genres WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
     env.CATALOG_DB.prepare("DELETE FROM media_cast WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
     env.CATALOG_DB.prepare("DELETE FROM media_directors WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
+    env.CATALOG_DB.prepare("DELETE FROM media_writers WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
+    env.CATALOG_DB.prepare("DELETE FROM media_creators WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
     env.CATALOG_DB.prepare("DELETE FROM media_countries WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
     env.CATALOG_DB.prepare("DELETE FROM media_trailers WHERE media_type = ? AND tmdb_id = ?").bind(mediaType, detail.id),
   ];
@@ -400,10 +460,20 @@ async function storeDetail(env: SyncEnv, mediaType: MediaType, detail: TmdbDetai
     ).bind(mediaType, detail.id, director.id, director.name, index));
   }
   if (mediaType === "movie") {
-    statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_director_checks (media_type, tmdb_id, checked_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(media_type, tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`)
-      .bind(mediaType, detail.id, updatedAt));
+    for (const [index, writer] of writers.entries()) {
+      statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_writers (media_type, tmdb_id, person_id, name, credit_role, writer_order)
+        VALUES (?, ?, ?, ?, ?, ?)`).bind(mediaType, detail.id, writer.id, writer.name, writer.role, index));
+    }
+    statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_movie_crew_checks (tmdb_id, checked_at)
+      VALUES (?, ?) ON CONFLICT(tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`).bind(detail.id, updatedAt));
+  }
+  if (mediaType === "tv") {
+    for (const [index, creator] of creators.entries()) {
+      statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_creators (media_type, tmdb_id, person_id, name, creator_order)
+        VALUES (?, ?, ?, ?, ?)`).bind(mediaType, detail.id, creator.id, creator.name, index));
+    }
+    statements.push(env.CATALOG_DB.prepare(`INSERT INTO media_creator_checks (tmdb_id, checked_at)
+      VALUES (?, ?) ON CONFLICT(tmdb_id) DO UPDATE SET checked_at=excluded.checked_at`).bind(detail.id, updatedAt));
   }
   await env.CATALOG_DB.batch(statements);
 
@@ -475,16 +545,17 @@ export default {
     const run = await env.CATALOG_DB.prepare("INSERT INTO sync_runs (trigger, started_at, status) VALUES (?, ?, ?)")
       .bind("cron", startedAt, "running").run();
     try {
-      const directorBackfillCount = await runDirectorBackfill(env);
+      const movieCrewBackfillCount = await runMovieCrewBackfill(env);
+      const creatorBackfillCount = movieCrewBackfillCount === 0 ? await runCreatorBackfill(env) : 0;
       const countryBackfillCount = await runCountryBackfill(env);
-      // Director enrichment temporarily receives the full rate-limited budget.
-      // Resume the lower-priority trailer backfill automatically when finished.
-      const trailerBackfillCount = directorBackfillCount === 0 ? await runTrailerBackfill(env) : 0;
+      // Crew enrichment runs first, then TV creators. Trailer backfill resumes
+      // only after both finite enrichment passes have completed.
+      const trailerBackfillCount = movieCrewBackfillCount === 0 && creatorBackfillCount === 0 ? await runTrailerBackfill(env) : 0;
       // During the one-time import, advance the discovery cursor on every
       // scheduled run. Later refreshes are deliberately reduced to daily.
       const timestamp = new Date();
       const initialImportRunning = await isInitialImportRunning(env);
-      const isDailyRefreshSlot = timestamp.getUTCHours() === 0 && timestamp.getUTCMinutes() === 5;
+      const isDailyRefreshSlot = timestamp.getUTCHours() === 18 && timestamp.getUTCMinutes() === 20;
       // The initial import walks the discovery cursor through historic pages.
       // Once it is complete, a daily refresh intentionally starts at page 1:
       // this fetches current popular/trending results instead of revisiting an
@@ -493,7 +564,7 @@ export default {
         ? await enqueueSeeds(env, 100)
         : isDailyRefreshSlot ? await enqueueSeeds(env, 100, 1) : 0;
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, seeded_count = ?, completed_at = ? WHERE id = ?")
-        .bind("completed", countryBackfillCount + trailerBackfillCount + directorBackfillCount + seededCount, now(), run.meta.last_row_id).run();
+        .bind("completed", countryBackfillCount + trailerBackfillCount + movieCrewBackfillCount + creatorBackfillCount + seededCount, now(), run.meta.last_row_id).run();
     } catch (error) {
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, error = ?, completed_at = ? WHERE id = ?")
         .bind("failed", error instanceof Error ? error.message : String(error), now(), run.meta.last_row_id).run();

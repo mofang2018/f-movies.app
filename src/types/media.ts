@@ -36,6 +36,8 @@ export interface MediaDetails extends MediaItem {
   status: string;
   genres: Genre[];
   directors: MediaPerson[];
+  writers: MediaPerson[];
+  creators: MediaPerson[];
   countries: string[];
   cast: MediaCredit[];
   similar: MediaItem[];

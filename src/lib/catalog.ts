@@ -264,10 +264,14 @@ export class CatalogClient {
     const media = await database.prepare(`SELECT ${mediaColumns} FROM media WHERE media_type = ? AND tmdb_id = ?`)
       .bind(mediaType, id).first<CatalogMediaRow>();
     if (!media) return null;
-    const [genresResult, directorsResult, countriesResult, castResult, similarResult, trailerResult] = await database.batch([
+    const [genresResult, directorsResult, writersResult, creatorsResult, countriesResult, castResult, similarResult, trailerResult] = await database.batch([
       database.prepare(`SELECT g.genre_id, g.name FROM genres g JOIN media_genres mg ON mg.genre_id = g.genre_id
         WHERE mg.media_type = ? AND mg.tmdb_id = ? ORDER BY g.name`).bind(mediaType, id),
       database.prepare("SELECT person_id, name FROM media_directors WHERE media_type = ? AND tmdb_id = ? ORDER BY director_order")
+        .bind(mediaType, id),
+      database.prepare("SELECT person_id, name FROM media_writers WHERE media_type = ? AND tmdb_id = ? ORDER BY writer_order")
+        .bind(mediaType, id),
+      database.prepare("SELECT person_id, name FROM media_creators WHERE media_type = ? AND tmdb_id = ? ORDER BY creator_order")
         .bind(mediaType, id),
       database.prepare("SELECT country_code FROM media_countries WHERE media_type = ? AND tmdb_id = ? ORDER BY country_code")
         .bind(mediaType, id),
@@ -280,6 +284,8 @@ export class CatalogClient {
     ]);
     const genres = (genresResult.results as CatalogGenreRow[]).map((genre) => ({ id: genre.genre_id, name: genre.name }));
     const directors: MediaPerson[] = (directorsResult.results as CatalogPersonRow[]).map((person) => ({ id: person.person_id, name: person.name }));
+    const writers: MediaPerson[] = [...new Map((writersResult.results as CatalogPersonRow[]).map((person) => [person.person_id, { id: person.person_id, name: person.name }])).values()];
+    const creators: MediaPerson[] = (creatorsResult.results as CatalogPersonRow[]).map((person) => ({ id: person.person_id, name: person.name }));
     const countries = (countriesResult.results as Array<{ country_code: string }>).map((country) => country.country_code);
     const cast: MediaCredit[] = (castResult.results as CatalogCastRow[]).map((person) => ({
       id: person.person_id,
@@ -296,6 +302,8 @@ export class CatalogClient {
       status: media.status ?? "",
       genres,
       directors,
+      writers,
+      creators,
       countries,
       cast,
       similar: await rowsWithGenres(similarRows, database),

@@ -29,6 +29,8 @@ const trailerEmbedUrl = details.trailerKey
 const parentPath = details.mediaType === "movie" ? "/movies" : "/tv-series";
 const parentLabel = details.mediaType === "movie" ? "Movies" : "TV Series";
 const directorNames = details.directors.map((director) => director.name);
+const writerNames = details.writers.map((writer) => writer.name);
+const creatorNames = details.creators.map((creator) => creator.name);
 const countryNames = details.countries.map(countryName);
 const personPlaceholder = "/images/person-placeholder.svg";
 const breadcrumbs = [
@@ -48,6 +50,8 @@ const structuredData = {
       ...(details.releaseDate ? { datePublished: details.releaseDate } : {}),
       ...(details.genres.length ? { genre: details.genres.map((genre) => genre.name) } : {}),
       ...(directorNames.length ? { director: directorNames.map((name) => ({ "@type": "Person", name })) } : {}),
+      ...(writerNames.length ? { author: writerNames.map((name) => ({ "@type": "Person", name })) } : {}),
+      ...(creatorNames.length ? { creator: creatorNames.map((name) => ({ "@type": "Person", name })) } : {}),
       ...(countryNames.length ? { countryOfOrigin: countryNames.map((name) => ({ "@type": "Country", name })) } : {}),
       ...(details.cast.length ? { actor: details.cast.map((person) => ({ "@type": "Person", name: person.name })) } : {}),
     },
@@ -101,12 +105,24 @@ const structuredData = {
             )}
             {details.status && <span>Status: {details.status}</span>}
           </div>
-          {(directorNames.length > 0 || countryNames.length > 0) && (
+          {(directorNames.length > 0 || writerNames.length > 0 || creatorNames.length > 0 || countryNames.length > 0) && (
             <dl class="title-facts" aria-label={`${details.title} production details`}>
               {directorNames.length > 0 && (
                 <div>
                   <dt>Director{directorNames.length === 1 ? "" : "s"}</dt>
                   <dd>{directorNames.join(", ")}</dd>
+                </div>
+              )}
+              {writerNames.length > 0 && (
+                <div>
+                  <dt>Writer{writerNames.length === 1 ? "" : "s"}</dt>
+                  <dd>{writerNames.join(", ")}</dd>
+                </div>
+              )}
+              {creatorNames.length > 0 && (
+                <div>
+                  <dt>Creator{creatorNames.length === 1 ? "" : "s"}</dt>
+                  <dd>{creatorNames.join(", ")}</dd>
                 </div>
               )}
               {countryNames.length > 0 && (
