@@ -94,6 +94,26 @@ function now(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Cron schedules can overlap during a deployment or a slow TMDB run. Keep a
+ * short D1 lease so only one catalog pass can consume the shared rate budget.
+ */
+async function acquireSyncLease(env: SyncEnv): Promise<boolean> {
+  const acquiredAt = now();
+  const expiresBefore = new Date(Date.now() - 45 * 60 * 1000).toISOString();
+  const result = await env.CATALOG_DB.prepare(`INSERT INTO sync_jobs (job_key, job_type, state, updated_at)
+    VALUES ('catalog-sync-lease', 'lease', 'running', ?)
+    ON CONFLICT(job_key) DO UPDATE SET state='running', updated_at=excluded.updated_at
+    WHERE sync_jobs.state != 'running' OR sync_jobs.updated_at < ?`)
+    .bind(acquiredAt, expiresBefore).run();
+  return result.meta.changes === 1;
+}
+
+async function releaseSyncLease(env: SyncEnv): Promise<void> {
+  await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = 'idle', updated_at = ? WHERE job_key = 'catalog-sync-lease'")
+    .bind(now()).run();
+}
+
 function isValidImagePath(path: string): boolean {
   return /^\/[a-zA-Z0-9_-]+\.(?:avif|jpe?g|png|webp)$/.test(path);
 }
@@ -541,6 +561,7 @@ export class TmdbRateLimiter implements DurableObject {
 
 export default {
   async scheduled(_controller: ScheduledController, env: SyncEnv): Promise<void> {
+    if (!await acquireSyncLease(env)) return;
     const startedAt = now();
     const run = await env.CATALOG_DB.prepare("INSERT INTO sync_runs (trigger, started_at, status) VALUES (?, ?, ?)")
       .bind("cron", startedAt, "running").run();
@@ -569,6 +590,8 @@ export default {
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, error = ?, completed_at = ? WHERE id = ?")
         .bind("failed", error instanceof Error ? error.message : String(error), now(), run.meta.last_row_id).run();
       throw error;
+    } finally {
+      await releaseSyncLease(env);
     }
   },
 
