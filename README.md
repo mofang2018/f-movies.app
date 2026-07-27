@@ -36,7 +36,7 @@ npx wrangler secret put SYNC_ADMIN_TOKEN --config wrangler.sync.jsonc
 npm run sync:deploy
 ```
 
-During the initial backfill, the Cron runs every 15 minutes and seeds at most 25 catalog entries per run. Posters and backdrops are written directly to R2 by the media consumer, rather than creating additional Queue messages per image; this keeps Queue free-tier usage below its daily operation limit. After the desired catalog size is reached, change the Cron back to an hourly schedule. The sync Worker intentionally has no public `workers.dev` route; expose a one-off seed endpoint only behind Cloudflare Access or a Service Binding when an operator console is added.
+During the initial backfill, the Cron advances the discovery cursor and seeds at most 100 catalog entries per run. Once that scan is complete, its daily `00:05 UTC` run (08:05 China Standard Time) starts from TMDB page 1 and refreshes at most 100 current popular/trending titles. Posters and backdrops are written directly to R2 by the media consumer, rather than creating additional Queue messages per image; this keeps Queue usage low. The sync Worker intentionally has no public `workers.dev` route; expose a one-off seed endpoint only behind Cloudflare Access or a Service Binding when an operator console is added.
 
 Country pages use readable paths such as `/country/united-states`. They query the local D1 catalog only: each synchronized title stores its TMDB production/origin country code in `media_countries`, so opening a Country page never makes a user-facing TMDB API request.
 

@@ -133,10 +133,10 @@ async function tmdbFetch<T>(env: SyncEnv, path: string, params: Record<string, s
   return response.json() as Promise<T>;
 }
 
-async function enqueueSeeds(env: SyncEnv, limit: number): Promise<number> {
+async function enqueueSeeds(env: SyncEnv, limit: number, pageOverride?: number): Promise<number> {
   const cursor = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
     .bind("seed-page-cursor").first<{ state: string }>();
-  const page = Math.max(1, Math.min(500, Number(cursor?.state ?? 1) || 1));
+  const page = pageOverride ?? Math.max(1, Math.min(500, Number(cursor?.state ?? 1) || 1));
   const sources: Array<{ path: string; mediaType: MediaType }> = [
     { path: "/trending/all/day", mediaType: "movie" },
     { path: "/trending/all/week", mediaType: "movie" },
@@ -165,12 +165,14 @@ async function enqueueSeeds(env: SyncEnv, limit: number): Promise<number> {
   for (let index = 0; index < messages.length; index += 100) {
     await env.MEDIA_SYNC_QUEUE.sendBatch(messages.slice(index, index + 100).map((body) => ({ body })));
   }
-  const nextPage = page >= 500 ? 1 : page + 1;
-  await env.CATALOG_DB.prepare(`INSERT INTO sync_jobs (job_key, job_type, state, updated_at)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(job_key) DO UPDATE SET state=excluded.state, updated_at=excluded.updated_at`)
-    .bind("seed-page-cursor", "catalog-page", String(nextPage), now()).run();
-  if (page >= 500) {
+  if (pageOverride === undefined) {
+    const nextPage = page >= 500 ? 1 : page + 1;
+    await env.CATALOG_DB.prepare(`INSERT INTO sync_jobs (job_key, job_type, state, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(job_key) DO UPDATE SET state=excluded.state, updated_at=excluded.updated_at`)
+      .bind("seed-page-cursor", "catalog-page", String(nextPage), now()).run();
+  }
+  if (pageOverride === undefined && page >= 500) {
     await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = ?, updated_at = ? WHERE job_key = ?")
       .bind("done", now(), "catalog-initial-import").run();
   }
@@ -458,7 +460,13 @@ export default {
       const timestamp = new Date();
       const initialImportRunning = await isInitialImportRunning(env);
       const isDailyRefreshSlot = timestamp.getUTCHours() === 0 && timestamp.getUTCMinutes() === 5;
-      const seededCount = initialImportRunning || isDailyRefreshSlot ? await enqueueSeeds(env, initialImportRunning ? 100 : 25) : 0;
+      // The initial import walks the discovery cursor through historic pages.
+      // Once it is complete, a daily refresh intentionally starts at page 1:
+      // this fetches current popular/trending results instead of revisiting an
+      // old, now-empty cursor page. Queue up to 100 titles per day.
+      const seededCount = initialImportRunning
+        ? await enqueueSeeds(env, 100)
+        : isDailyRefreshSlot ? await enqueueSeeds(env, 100, 1) : 0;
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, seeded_count = ?, completed_at = ? WHERE id = ?")
         .bind("completed", countryBackfillCount + trailerBackfillCount + directorBackfillCount + seededCount, now(), run.meta.last_row_id).run();
     } catch (error) {
