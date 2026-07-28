@@ -5,7 +5,9 @@
   "compatibility_date": "2026-07-22",
   "workers_dev": false,
   "observability": { "enabled": true },
-  "triggers": { "crons": ["20 6,18 * * *"] },
+  // Four evenly spaced runs per day. Each run processes up to 500 metadata
+  // enrichment records under the Worker-wide TMDB rate limiter.
+  "triggers": { "crons": ["20 0,6,12,18 * * *"] },
   "d1_databases": [
     {
       "binding": "CATALOG_DB",
