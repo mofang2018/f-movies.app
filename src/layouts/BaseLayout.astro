@@ -76,7 +76,7 @@ Astro.response.headers.set(
     <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`}></script>
     <script is:inline define:vars={{ googleAnalyticsId }}>
       window.dataLayer = window.dataLayer || [];
-      function gtag(...args) { window.dataLayer.push(args); }
+      function gtag() { window.dataLayer.push(arguments); }
       gtag("js", new Date());
       gtag("config", googleAnalyticsId);
     </script>
