@@ -72,12 +72,13 @@ const structuredData = [
   structuredData={structuredData}
 >
   <section class="landing-hero">
-    <div class="landing-orb landing-orb-one"></div>
-    <div class="landing-orb landing-orb-two"></div>
     <div class="landing-hero-content container">
-      <span class="landing-kicker">Movie discovery guide</span>
-      <h1>Watch FMovies: discover movies and TV series</h1>
-      <p>Watch FMovies to search titles, browse popular genres and countries, and build your next watchlist with movie and TV-series details in one place.</p>
+      <img class="landing-brand" src="/logo.svg" width="236" height="67" alt="FMOVIES" />
+      <div class="landing-seo-copy">
+        <span>Movie discovery guide</span>
+        <h1>Watch FMovies: discover movies and TV series</h1>
+        <p>Watch FMovies to search titles, browse popular genres and countries, and build your next watchlist with movie and TV-series details in one place.</p>
+      </div>
       <form class="landing-search" action="/search" method="get">
         <label class="screen-reader-only" for="landing-query">Search titles</label>
         <input id="landing-query" type="search" name="q" placeholder="Search movies and TV series" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="landing-suggestions" />
@@ -252,42 +253,16 @@ const structuredData = [
 <style>
   .landing-hero {
     position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    min-height: 580px;
-    padding: 128px 0 112px;
+    min-height: 390px;
+    padding: 78px 0 70px;
     background:
-      linear-gradient(105deg, rgba(11, 13, 17, 0.98) 4%, rgba(19, 27, 28, 0.91) 52%, rgba(28, 39, 22, 0.84)),
-      #151a1c;
-  }
-
-  .landing-orb {
-    position: absolute;
-    z-index: -1;
-    border-radius: 999px;
-    filter: blur(5px);
-    opacity: 0.46;
-  }
-
-  .landing-orb-one {
-    top: -190px;
-    right: -50px;
-    width: 650px;
-    height: 650px;
-    background: radial-gradient(circle, #92c32e 0%, rgba(146, 195, 46, 0) 68%);
-  }
-
-  .landing-orb-two {
-    right: 27%;
-    bottom: -290px;
-    width: 540px;
-    height: 540px;
-    background: radial-gradient(circle, #00778a 0%, rgba(0, 119, 138, 0) 68%);
+      linear-gradient(90deg, rgba(16, 19, 24, 0.98), rgba(24, 30, 31, 0.96)),
+      #181d23;
   }
 
   .landing-hero-content {
     display: flex;
-    max-width: calc(var(--content-width) - 140px);
+    max-width: calc(var(--content-width) - 220px);
     align-items: center;
     flex-direction: column;
     margin-left: max(24px, calc((100vw - var(--content-width)) / 2));
@@ -295,37 +270,26 @@ const structuredData = [
     text-align: center;
   }
 
-  .landing-kicker {
-    display: block;
-    margin-bottom: 15px;
-    color: var(--color-accent);
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
+  .landing-brand {
+    width: 236px;
+    height: auto;
   }
 
-  .landing-hero h1 {
-    max-width: 760px;
-    margin: 0;
-    font-size: clamp(42px, 6vw, 74px);
-    letter-spacing: -0.045em;
-    line-height: 0.99;
-  }
-
-  .landing-hero p {
-    max-width: 650px;
-    margin: 22px auto 0;
-    color: #d1d6d5;
-    font-size: clamp(17px, 2vw, 20px);
+  .landing-seo-copy {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
 
   .landing-search {
     position: relative;
     display: flex;
-    width: min(100%, 680px);
+    width: min(100%, 720px);
     gap: 8px;
-    margin: 32px auto 0;
+    margin: 34px auto 0;
   }
 
   .landing-search input {
@@ -403,7 +367,7 @@ const structuredData = [
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 18px;
+    margin-top: 16px;
   }
 
   .landing-content {
@@ -525,8 +489,8 @@ const structuredData = [
 
   @media (max-width: 760px) {
     .landing-hero {
-      min-height: 520px;
-      padding: 94px 0 74px;
+      min-height: 360px;
+      padding: 62px 0 56px;
     }
 
     .landing-hero-content {
@@ -548,6 +512,10 @@ const structuredData = [
     .landing-search .button {
       min-height: 54px;
       padding-inline: 16px;
+    }
+
+    .landing-brand {
+      width: 198px;
     }
 
     .landing-suggestions {
