@@ -43,8 +43,9 @@ const isCountryActive = currentPath.startsWith("/country/");
 
     <form class="header-search" action="/search" method="get">
       <label class="screen-reader-only" for="header-query">Search movies and TV series</label>
-      <input id="header-query" type="search" name="q" placeholder="Search" autocomplete="off" />
+      <input id="header-query" type="search" name="q" placeholder="Search" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="header-suggestions" />
       <button type="submit" aria-label="Search"><Search size={17} stroke-width={2.2} /></button>
+      <div id="header-suggestions" class="search-suggestions" role="listbox" hidden></div>
     </form>
 
     <button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
@@ -56,8 +57,9 @@ const isCountryActive = currentPath.startsWith("/country/");
   <div id="mobile-menu" class="mobile-menu" hidden>
     <form class="mobile-search" action="/search" method="get">
       <label class="screen-reader-only" for="mobile-query">Search movies and TV series</label>
-      <input id="mobile-query" type="search" name="q" placeholder="Search movies and TV..." />
+      <input id="mobile-query" type="search" name="q" placeholder="Search movies and TV..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="mobile-suggestions" />
       <button type="submit" aria-label="Search"><Search size={18} /></button>
+      <div id="mobile-suggestions" class="search-suggestions" role="listbox" hidden></div>
     </form>
     <nav aria-label="Mobile navigation">
       <a class:list={{ active: isActive("/home") }} href="/home" aria-current={isActive("/home") ? "page" : undefined}>Home</a>
@@ -105,6 +107,109 @@ const isCountryActive = currentPath.startsWith("/country/");
     desktopDropdowns.forEach((dropdown) => {
       if (dropdown instanceof HTMLDetailsElement && !dropdown.contains(event.target as Node)) dropdown.open = false;
     });
+  });
+
+  interface Suggestion {
+    title: string;
+    year: string | null;
+    url: string;
+  }
+
+  const searchForms = Array.from(document.querySelectorAll(".header-search, .mobile-search"));
+  searchForms.forEach((form) => {
+    if (!(form instanceof HTMLFormElement)) return;
+    const input = form.querySelector('input[type="search"]');
+    const panel = form.querySelector(".search-suggestions");
+    if (!(input instanceof HTMLInputElement) || !(panel instanceof HTMLElement)) return;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let controller: AbortController | undefined;
+    let activeIndex = -1;
+
+    const close = () => {
+      if (timer) clearTimeout(timer);
+      controller?.abort();
+      activeIndex = -1;
+      panel.hidden = true;
+      panel.replaceChildren();
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+    };
+
+    const select = (index: number) => {
+      const options = Array.from(panel.querySelectorAll<HTMLAnchorElement>("a"));
+      activeIndex = index;
+      options.forEach((option, optionIndex) => option.classList.toggle("active", optionIndex === index));
+      const active = options[index];
+      if (active) input.setAttribute("aria-activedescendant", active.id);
+      else input.removeAttribute("aria-activedescendant");
+    };
+
+    const show = (results: Suggestion[]) => {
+      panel.replaceChildren();
+      activeIndex = -1;
+      if (!results.length) {
+        panel.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        return;
+      }
+      results.forEach((result, index) => {
+        const option = document.createElement("a");
+        option.href = result.url;
+        option.id = `${input.id}-suggestion-${index}`;
+        option.setAttribute("role", "option");
+        option.className = "search-suggestion";
+        const title = document.createElement("span");
+        title.textContent = result.title;
+        const year = document.createElement("span");
+        year.className = "search-suggestion-year";
+        year.textContent = result.year ?? "-";
+        option.appendChild(title);
+        option.appendChild(year);
+        panel.appendChild(option);
+      });
+      panel.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+    };
+
+    input.addEventListener("input", () => {
+      if (timer) clearTimeout(timer);
+      controller?.abort();
+      const query = input.value.trim();
+      if (query.length < 3) {
+        close();
+        return;
+      }
+      timer = setTimeout(async () => {
+        controller = new AbortController();
+        try {
+          const response = await fetch(`/api/suggest?q=${encodeURIComponent(query)}`, { signal: controller.signal });
+          if (!response.ok || input.value.trim() !== query) return;
+          const data = await response.json() as { results?: Suggestion[] };
+          show(Array.isArray(data.results) ? data.results : []);
+        } catch (error) {
+          if ((error as DOMException).name !== "AbortError") close();
+        }
+      }, 300);
+    });
+
+    input.addEventListener("keydown", (event) => {
+      const options = Array.from(panel.querySelectorAll<HTMLAnchorElement>("a"));
+      if (event.key === "Escape") {
+        close();
+      } else if (event.key === "ArrowDown" && options.length) {
+        event.preventDefault();
+        select((activeIndex + 1) % options.length);
+      } else if (event.key === "ArrowUp" && options.length) {
+        event.preventDefault();
+        select((activeIndex - 1 + options.length) % options.length);
+      } else if (event.key === "Enter" && activeIndex >= 0 && options[activeIndex]) {
+        event.preventDefault();
+        options[activeIndex].click();
+      }
+    });
+
+    input.addEventListener("blur", () => setTimeout(close, 150));
   });
 </script>
 
@@ -243,7 +348,6 @@ const isCountryActive = currentPath.startsWith("/country/");
   .mobile-search {
     position: relative;
     display: flex;
-    overflow: hidden;
     background: #fff;
   }
 
@@ -283,6 +387,46 @@ const isCountryActive = currentPath.startsWith("/country/");
   .header-search button:hover,
   .mobile-search button:hover {
     color: var(--header-accent);
+  }
+
+  .search-suggestions {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    overflow: hidden;
+    border: 1px solid rgba(13, 20, 28, 0.14);
+    background: #fff;
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
+  }
+
+  .search-suggestion {
+    display: flex;
+    min-height: 43px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 0 13px;
+    border-bottom: 1px solid rgba(13, 20, 28, 0.1);
+    color: #242832;
+    font-size: 14px;
+  }
+
+  .search-suggestion:last-child {
+    border-bottom: 0;
+  }
+
+  .search-suggestion:hover,
+  .search-suggestion.active {
+    background: #edf5f7;
+    color: #17252c;
+  }
+
+  .search-suggestion-year {
+    flex: 0 0 auto;
+    color: #69717c;
+    font-variant-numeric: tabular-nums;
   }
 
   .menu-toggle,
