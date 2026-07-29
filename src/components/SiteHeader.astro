@@ -396,36 +396,38 @@ const isCountryActive = currentPath.startsWith("/country/");
     right: 0;
     left: 0;
     overflow: hidden;
-    border: 1px solid rgba(13, 20, 28, 0.14);
-    background: #fff;
-    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
+    border: 1px solid rgba(111, 136, 151, 0.42);
+    border-radius: 4px;
+    background: #171c23;
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.48);
   }
 
-  .search-suggestion {
+  :global(.search-suggestion) {
     display: flex;
-    min-height: 43px;
+    min-height: 46px;
     align-items: center;
     justify-content: space-between;
     gap: 18px;
     padding: 0 13px;
-    border-bottom: 1px solid rgba(13, 20, 28, 0.1);
-    color: #242832;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #f0f3f6;
     font-size: 14px;
+    font-weight: 600;
   }
 
-  .search-suggestion:last-child {
+  :global(.search-suggestion:last-child) {
     border-bottom: 0;
   }
 
-  .search-suggestion:hover,
-  .search-suggestion.active {
-    background: #edf5f7;
-    color: #17252c;
+  :global(.search-suggestion:hover),
+  :global(.search-suggestion.active) {
+    background: rgba(52, 127, 156, 0.28);
+    color: #fff;
   }
 
-  .search-suggestion-year {
+  :global(.search-suggestion-year) {
     flex: 0 0 auto;
-    color: #69717c;
+    color: #aab4be;
     font-variant-numeric: tabular-nums;
   }
 

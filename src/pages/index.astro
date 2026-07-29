@@ -80,8 +80,9 @@ const structuredData = [
       <p>Watch FMovies to search titles, browse popular genres and countries, and build your next watchlist with movie and TV-series details in one place.</p>
       <form class="landing-search" action="/search" method="get">
         <label class="screen-reader-only" for="landing-query">Search titles</label>
-        <input id="landing-query" type="search" name="q" placeholder="Search movies and TV series" autocomplete="off" />
+        <input id="landing-query" type="search" name="q" placeholder="Search movies and TV series" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="landing-suggestions" />
         <button class="button button-primary" type="submit">Search</button>
+        <div id="landing-suggestions" class="landing-suggestions" role="listbox" hidden></div>
       </form>
       <div class="landing-actions">
         <a class="button button-secondary" href="/home">Go to home page</a>
@@ -144,6 +145,109 @@ const structuredData = [
     </section>
   </div>
 </BaseLayout>
+
+<script>
+  interface Suggestion {
+    title: string;
+    year: string | null;
+    url: string;
+  }
+
+  const form = document.querySelector(".landing-search");
+  const input = form?.querySelector('input[type="search"]');
+  const panel = form?.querySelector(".landing-suggestions");
+
+  if (input instanceof HTMLInputElement && panel instanceof HTMLElement) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let controller: AbortController | undefined;
+    let activeIndex = -1;
+
+    const close = () => {
+      if (timer) clearTimeout(timer);
+      controller?.abort();
+      activeIndex = -1;
+      panel.hidden = true;
+      panel.replaceChildren();
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+    };
+
+    const select = (index: number) => {
+      const options = Array.from(panel.querySelectorAll<HTMLAnchorElement>("a"));
+      activeIndex = index;
+      options.forEach((option, optionIndex) => option.classList.toggle("active", optionIndex === index));
+      const active = options[index];
+      if (active) input.setAttribute("aria-activedescendant", active.id);
+      else input.removeAttribute("aria-activedescendant");
+    };
+
+    const show = (results: Suggestion[]) => {
+      panel.replaceChildren();
+      activeIndex = -1;
+      if (!results.length) {
+        panel.hidden = true;
+        input.setAttribute("aria-expanded", "false");
+        return;
+      }
+      results.forEach((result, index) => {
+        const option = document.createElement("a");
+        option.href = result.url;
+        option.id = `landing-query-suggestion-${index}`;
+        option.setAttribute("role", "option");
+        option.className = "landing-suggestion";
+        const title = document.createElement("span");
+        title.textContent = result.title;
+        const year = document.createElement("span");
+        year.className = "landing-suggestion-year";
+        year.textContent = result.year ?? "-";
+        option.appendChild(title);
+        option.appendChild(year);
+        panel.appendChild(option);
+      });
+      panel.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+    };
+
+    input.addEventListener("input", () => {
+      if (timer) clearTimeout(timer);
+      controller?.abort();
+      const query = input.value.trim();
+      if (query.length < 3) {
+        close();
+        return;
+      }
+      timer = setTimeout(async () => {
+        controller = new AbortController();
+        try {
+          const response = await fetch(`/api/suggest?q=${encodeURIComponent(query)}`, { signal: controller.signal });
+          if (!response.ok || input.value.trim() !== query) return;
+          const data = await response.json() as { results?: Suggestion[] };
+          show(Array.isArray(data.results) ? data.results : []);
+        } catch (error) {
+          if ((error as DOMException).name !== "AbortError") close();
+        }
+      }, 300);
+    });
+
+    input.addEventListener("keydown", (event) => {
+      const options = Array.from(panel.querySelectorAll<HTMLAnchorElement>("a"));
+      if (event.key === "Escape") {
+        close();
+      } else if (event.key === "ArrowDown" && options.length) {
+        event.preventDefault();
+        select((activeIndex + 1) % options.length);
+      } else if (event.key === "ArrowUp" && options.length) {
+        event.preventDefault();
+        select((activeIndex - 1 + options.length) % options.length);
+      } else if (event.key === "Enter" && activeIndex >= 0 && options[activeIndex]) {
+        event.preventDefault();
+        options[activeIndex].click();
+      }
+    });
+
+    input.addEventListener("blur", () => setTimeout(close, 150));
+  }
+</script>
 
 <style>
   .landing-hero {
@@ -217,6 +321,7 @@ const structuredData = [
   }
 
   .landing-search {
+    position: relative;
     display: flex;
     width: min(100%, 680px);
     gap: 8px;
@@ -242,6 +347,57 @@ const structuredData = [
   .landing-search .button {
     min-height: 56px;
     flex: 0 0 auto;
+  }
+
+  .landing-suggestions {
+    position: absolute;
+    z-index: 10;
+    top: calc(100% + 8px);
+    right: 94px;
+    left: 0;
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid rgba(172, 221, 38, 0.42);
+    border-radius: var(--radius);
+    background: #161c21;
+    box-shadow: 0 20px 46px rgba(0, 0, 0, 0.46);
+    text-align: left;
+  }
+
+  :global(.landing-suggestion) {
+    display: flex;
+    min-height: 50px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    padding: 0 18px 0 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+    color: #f4f6f4;
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  :global(.landing-suggestion:last-child) {
+    border-bottom: 0;
+  }
+
+  :global(.landing-suggestion:hover),
+  :global(.landing-suggestion.active) {
+    background: rgba(172, 221, 38, 0.14);
+    color: #d4f16f;
+  }
+
+  :global(.landing-suggestion-year) {
+    flex: 0 0 auto;
+    color: #aeb6b5;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+
+  :global(.landing-suggestion:hover .landing-suggestion-year),
+  :global(.landing-suggestion.active .landing-suggestion-year) {
+    color: #d4f16f;
   }
 
   .landing-actions {
@@ -393,6 +549,10 @@ const structuredData = [
     .landing-search .button {
       min-height: 54px;
       padding-inline: 16px;
+    }
+
+    .landing-suggestions {
+      right: 88px;
     }
 
     .landing-content {
