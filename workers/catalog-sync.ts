@@ -157,56 +157,71 @@ async function tmdbFetch<T>(env: SyncEnv, path: string, params: Record<string, s
   return response.json() as Promise<T>;
 }
 
-async function enqueueSeeds(env: SyncEnv, limit: number, pageOverride?: number): Promise<number> {
-  const cursor = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
-    .bind("seed-page-cursor").first<{ state: string }>();
-  const page = pageOverride ?? Math.max(1, Math.min(500, Number(cursor?.state ?? 1) || 1));
-  const sources: Array<{ path: string; mediaType: MediaType }> = [
+/**
+ * Finds recently released, currently airing and trending titles. The detail
+ * consumer is deliberately given only titles that do not already exist in D1:
+ * the limited detail-request budget is reserved for genuinely new catalogue
+ * pages, while every queued title is hydrated in one request with its credits
+ * and YouTube videos.
+ */
+async function enqueueNewCatalogEntries(env: SyncEnv, limit: number): Promise<number> {
+  const releaseWindow = new Date();
+  releaseWindow.setUTCDate(releaseWindow.getUTCDate() - 45);
+  const recentReleaseDate = releaseWindow.toISOString().slice(0, 10);
+  const sources: Array<{ path: string; mediaType: MediaType; params?: Record<string, string | number> }> = [
     { path: "/trending/all/day", mediaType: "movie" },
     { path: "/trending/all/week", mediaType: "movie" },
-    { path: "/movie/popular", mediaType: "movie" },
     { path: "/movie/now_playing", mediaType: "movie" },
-    { path: "/movie/top_rated", mediaType: "movie" },
-    { path: "/tv/popular", mediaType: "tv" },
+    { path: "/movie/upcoming", mediaType: "movie" },
+    { path: "/discover/movie", mediaType: "movie", params: { "primary_release_date.gte": recentReleaseDate, sort_by: "popularity.desc" } },
+    { path: "/tv/airing_today", mediaType: "tv" },
     { path: "/tv/on_the_air", mediaType: "tv" },
-    { path: "/tv/top_rated", mediaType: "tv" },
+    { path: "/discover/tv", mediaType: "tv", params: { "first_air_date.gte": recentReleaseDate, sort_by: "popularity.desc" } },
   ];
   const lists = await Promise.all(sources.map(async (source) => ({
     source,
-    list: await tmdbFetch<TmdbListResponse>(env, source.path, { page }),
+    list: await tmdbFetch<TmdbListResponse>(env, source.path, { page: 1, ...source.params }),
   })));
-  const seen = new Set<string>();
-  const messages: MediaMessage[] = [];
+  const candidates = new Map<string, MediaMessage>();
   for (const { source, list } of lists) {
     for (const item of list.results) {
       const mediaType: MediaType = item.media_type === "tv" ? "tv" : item.media_type === "movie" ? "movie" : source.mediaType;
       const key = `${mediaType}:${item.id}`;
-      if (seen.has(key) || messages.length >= limit) continue;
-      seen.add(key);
-      messages.push({ kind: "media", mediaType, tmdbId: item.id });
+      candidates.set(key, { kind: "media", mediaType, tmdbId: item.id });
     }
+  }
+
+  const existing = new Set<string>();
+  for (const mediaType of ["movie", "tv"] as const) {
+    const ids = [...candidates.values()]
+      .filter((candidate) => candidate.mediaType === mediaType)
+      .map((candidate) => candidate.tmdbId);
+    for (let index = 0; index < ids.length; index += 50) {
+      const batch = ids.slice(index, index + 50);
+      if (!batch.length) continue;
+      const placeholders = batch.map(() => "?").join(", ");
+      const rows = await env.CATALOG_DB.prepare(`SELECT tmdb_id FROM media
+        WHERE media_type = ? AND tmdb_id IN (${placeholders})`).bind(mediaType, ...batch)
+        .all<{ tmdb_id: number }>();
+      for (const row of rows.results) existing.add(`${mediaType}:${row.tmdb_id}`);
+    }
+  }
+
+  const unknown = [...candidates.entries()]
+    .filter(([key]) => !existing.has(key))
+    .map(([, message]) => message);
+  const movieLimit = Math.ceil(limit / 2);
+  const movies = unknown.filter((message) => message.mediaType === "movie").slice(0, movieLimit);
+  const tv = unknown.filter((message) => message.mediaType === "tv").slice(0, limit - movies.length);
+  const messages = [...movies, ...tv];
+  if (messages.length < limit) {
+    const selected = new Set(messages.map((message) => `${message.mediaType}:${message.tmdbId}`));
+    messages.push(...unknown.filter((message) => !selected.has(`${message.mediaType}:${message.tmdbId}`)).slice(0, limit - messages.length));
   }
   for (let index = 0; index < messages.length; index += 100) {
     await env.MEDIA_SYNC_QUEUE.sendBatch(messages.slice(index, index + 100).map((body) => ({ body })));
   }
-  if (pageOverride === undefined) {
-    const nextPage = page >= 500 ? 1 : page + 1;
-    await env.CATALOG_DB.prepare(`INSERT INTO sync_jobs (job_key, job_type, state, updated_at)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(job_key) DO UPDATE SET state=excluded.state, updated_at=excluded.updated_at`)
-      .bind("seed-page-cursor", "catalog-page", String(nextPage), now()).run();
-  }
-  if (pageOverride === undefined && page >= 500) {
-    await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = ?, updated_at = ? WHERE job_key = ?")
-      .bind("done", now(), "catalog-initial-import").run();
-  }
   return messages.length;
-}
-
-async function isInitialImportRunning(env: SyncEnv): Promise<boolean> {
-  const job = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
-    .bind("catalog-initial-import").first<{ state: string }>();
-  return !job || job.state !== "done";
 }
 
 /**
@@ -572,18 +587,11 @@ export default {
       // Crew enrichment runs first, then TV creators. Trailer backfill resumes
       // only after both finite enrichment passes have completed.
       const trailerBackfillCount = movieCrewBackfillCount === 0 && creatorBackfillCount === 0 ? await runTrailerBackfill(env) : 0;
-      // During the one-time import, advance the discovery cursor on every
-      // scheduled run. Later refreshes are deliberately reduced to daily.
-      const timestamp = new Date();
-      const initialImportRunning = await isInitialImportRunning(env);
-      const isDailyRefreshSlot = timestamp.getUTCHours() === 18 && timestamp.getUTCMinutes() === 20;
-      // The initial import walks the discovery cursor through historic pages.
-      // Once it is complete, a daily refresh intentionally starts at page 1:
-      // this fetches current popular/trending results instead of revisiting an
-      // old, now-empty cursor page. Queue up to 100 titles per day.
-      const seededCount = initialImportRunning
-        ? await enqueueSeeds(env, 100)
-        : isDailyRefreshSlot ? await enqueueSeeds(env, 100, 1) : 0;
+      // Four small discovery passes cover recent theatrical, streaming and TV
+      // releases without revisiting the historic import cursor. Only unknown
+      // titles are queued, and the queue consumer stores each title's complete
+      // currently-used detail set in the same pass.
+      const seededCount = await enqueueNewCatalogEntries(env, 100);
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, seeded_count = ?, completed_at = ? WHERE id = ?")
         .bind("completed", countryBackfillCount + trailerBackfillCount + movieCrewBackfillCount + creatorBackfillCount + seededCount, now(), run.meta.last_row_id).run();
     } catch (error) {
@@ -616,7 +624,7 @@ export default {
         return new Response("Unauthorized", { status: 401 });
       }
       const rawLimit = Number(url.searchParams.get("limit") ?? 100);
-      const seededCount = await enqueueSeeds(env, Math.max(1, Math.min(500, Math.floor(rawLimit))));
+      const seededCount = await enqueueNewCatalogEntries(env, Math.max(1, Math.min(500, Math.floor(rawLimit))));
       return Response.json({ queued: seededCount });
     }
     return new Response("Not found", { status: 404 });
