@@ -89,6 +89,9 @@ interface TmdbDetail {
 
 const apiBase = "https://api.themoviedb.org/3";
 const maxImageBytes = { poster: 8_000_000, profile: 8_000_000, backdrop: 16_000_000 } as const;
+const historicalCatalogWindowEndsAt = Date.parse("2026-11-13T15:59:59.999+08:00");
+const historicalPagesPerMediaType = 10;
+const newCatalogDiscoveryIntervalMs = 5 * 24 * 60 * 60 * 1000;
 
 function now(): string {
   return new Date().toISOString();
@@ -191,6 +194,25 @@ async function enqueueNewCatalogEntries(env: SyncEnv, limit: number): Promise<nu
     }
   }
 
+  return enqueueUnknownCandidates(env, candidates, limit);
+}
+
+/** New-release discovery is intentionally low-frequency after the initial import. */
+async function runNewCatalogDiscovery(env: SyncEnv): Promise<number> {
+  const job = await env.CATALOG_DB.prepare("SELECT updated_at FROM sync_jobs WHERE job_key = ?")
+    .bind("new-catalog-last-run").first<{ updated_at: string }>();
+  const lastRunAt = job ? Date.parse(job.updated_at) : Number.NaN;
+  if (Number.isFinite(lastRunAt) && Date.now() - lastRunAt < newCatalogDiscoveryIntervalMs) return 0;
+
+  const queued = await enqueueNewCatalogEntries(env, 100);
+  await env.CATALOG_DB.prepare(`INSERT INTO sync_jobs (job_key, job_type, state, updated_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(job_key) DO UPDATE SET state=excluded.state, updated_at=excluded.updated_at`)
+    .bind("new-catalog-last-run", "new-catalog-discovery", String(queued), now()).run();
+  return queued;
+}
+
+async function enqueueUnknownCandidates(env: SyncEnv, candidates: Map<string, MediaMessage>, limit: number): Promise<number> {
   const existing = new Set<string>();
   for (const mediaType of ["movie", "tv"] as const) {
     const ids = [...candidates.values()]
@@ -222,6 +244,67 @@ async function enqueueNewCatalogEntries(env: SyncEnv, limit: number): Promise<nu
     await env.MEDIA_SYNC_QUEUE.sendBatch(messages.slice(index, index + 100).map((body) => ({ body })));
   }
   return messages.length;
+}
+
+/**
+ * A finite 3-month catalogue expansion. It moves through several different
+ * historical discovery orderings, so the 500-page TMDB limit on any one sort
+ * cannot end the plan early. Each daily pass reads 200 candidates per type and
+ * queues up to 100 previously unseen movies plus 100 TV series.
+ */
+async function enqueueHistoricalCatalogEntries(env: SyncEnv, limit = 200): Promise<number> {
+  const job = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
+    .bind("historical-catalog-cursor").first<{ state: string }>();
+  if (job?.state === "done" || Date.now() > historicalCatalogWindowEndsAt) {
+    if (job && job.state !== "done") {
+      await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = ?, updated_at = ? WHERE job_key = ?")
+        .bind("done", now(), "historical-catalog-cursor").run();
+    }
+    return 0;
+  }
+
+  const initialCursor = await env.CATALOG_DB.prepare("SELECT state FROM sync_jobs WHERE job_key = ?")
+    .bind("seed-page-cursor").first<{ state: string }>();
+  const firstPage = Math.max(1, Math.min(500, Number(initialCursor?.state ?? 188) + 1));
+  const [rawStrategy, rawPage] = (job?.state ?? `0:${firstPage}`).split(":");
+  const strategy = Math.max(0, Number(rawStrategy) || 0);
+  const page = Math.max(1, Math.min(500, Number(rawPage ?? firstPage) || firstPage));
+  const strategies: Array<Record<MediaType, string>> = [
+    { movie: "popularity.desc", tv: "popularity.desc" },
+    { movie: "vote_count.desc", tv: "vote_count.desc" },
+    { movie: "primary_release_date.desc", tv: "first_air_date.desc" },
+    { movie: "primary_release_date.asc", tv: "first_air_date.asc" },
+  ];
+  const sortBy = strategies[strategy];
+  if (!sortBy) {
+    await env.CATALOG_DB.prepare("UPDATE sync_jobs SET state = ?, updated_at = ? WHERE job_key = ?")
+      .bind("done", now(), "historical-catalog-cursor").run();
+    return 0;
+  }
+  const pages = Array.from({ length: historicalPagesPerMediaType }, (_, index) => page + index).filter((candidate) => candidate <= 500);
+  if (!pages.length) return 0;
+
+  const candidates = new Map<string, MediaMessage>();
+  for (const mediaType of ["movie", "tv"] as const) {
+    for (const discoverPage of pages) {
+      const list = await tmdbFetch<TmdbListResponse>(env, `/discover/${mediaType}`, {
+        page: discoverPage,
+        sort_by: sortBy[mediaType],
+      });
+      for (const item of list.results) {
+        candidates.set(`${mediaType}:${item.id}`, { kind: "media", mediaType, tmdbId: item.id });
+      }
+    }
+  }
+
+  const queued = await enqueueUnknownCandidates(env, candidates, limit);
+  const nextPage = page + historicalPagesPerMediaType;
+  const nextState = nextPage > 500 ? `${strategy + 1}:1` : `${strategy}:${nextPage}`;
+  await env.CATALOG_DB.prepare(`INSERT INTO sync_jobs (job_key, job_type, state, updated_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(job_key) DO UPDATE SET state=excluded.state, updated_at=excluded.updated_at`)
+    .bind("historical-catalog-cursor", "historical-catalog", nextState, now()).run();
+  return queued;
 }
 
 /**
@@ -587,13 +670,19 @@ export default {
       // Crew enrichment runs first, then TV creators. Trailer backfill resumes
       // only after both finite enrichment passes have completed.
       const trailerBackfillCount = movieCrewBackfillCount === 0 && creatorBackfillCount === 0 ? await runTrailerBackfill(env) : 0;
-      // Four small discovery passes cover recent theatrical, streaming and TV
-      // releases without revisiting the historic import cursor. Only unknown
-      // titles are queued, and the queue consumer stores each title's complete
-      // currently-used detail set in the same pass.
-      const seededCount = await enqueueNewCatalogEntries(env, 100);
+      // Current theatrical, streaming and TV releases are checked once every
+      // five days. Only unknown titles are queued, and each is stored through
+      // the complete-detail pipeline in the same pass.
+      const seededCount = await runNewCatalogDiscovery(env);
+      // A separate bounded historical pass runs once a day at 02:20 Beijing
+      // time (18:20 UTC) through 13 November 2026. It never refreshes or
+      // overwrites known entries; its budget is reserved for missing titles.
+      const timestamp = new Date();
+      const historicalCount = timestamp.getUTCHours() === 18 && timestamp.getUTCMinutes() === 20
+        ? await enqueueHistoricalCatalogEntries(env)
+        : 0;
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, seeded_count = ?, completed_at = ? WHERE id = ?")
-        .bind("completed", countryBackfillCount + trailerBackfillCount + movieCrewBackfillCount + creatorBackfillCount + seededCount, now(), run.meta.last_row_id).run();
+        .bind("completed", countryBackfillCount + trailerBackfillCount + movieCrewBackfillCount + creatorBackfillCount + seededCount + historicalCount, now(), run.meta.last_row_id).run();
     } catch (error) {
       await env.CATALOG_DB.prepare("UPDATE sync_runs SET status = ?, error = ?, completed_at = ? WHERE id = ?")
         .bind("failed", error instanceof Error ? error.message : String(error), now(), run.meta.last_row_id).run();
